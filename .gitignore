@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2021-2025 Robin Vobruba <hoijui.quaero@gmail.com>
+#
+# SPDX-License-Identifier: Unlicense
+
+/target
+
+workdir/
+export/
+config.yml
+
