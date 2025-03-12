@@ -103,7 +103,7 @@ fn extract_file_extension(path: impl AsRef<Path>) -> Result<String, FindError> {
 
 pub fn find_recursive(
     base: impl AsRef<Path>,
-    filen_name_pattern: &Regex,
+    file_name_pattern: &Regex,
 ) -> Result<Vec<PathBuf>, FindError> {
     let base_path = base.as_ref().to_path_buf();
     let mut dirs = vec![base_path];
@@ -129,7 +129,7 @@ pub fn find_recursive(
                                         tracing::trace!(
                                             "find_recursive - matching file: '{file_name:?}' ..."
                                         );
-                                        if filen_name_pattern.is_match(&file_name) {
+                                        if file_name_pattern.is_match(&file_name) {
                                             return Some(Ok(entry_path));
                                         }
                                     }
