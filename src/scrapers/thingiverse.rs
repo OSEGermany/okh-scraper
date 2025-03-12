@@ -289,7 +289,7 @@ impl Scraper {
     }
 
     // #[instrument]
-    async fn parse_api_response<T: serde::de::DeserializeOwned>(content: &str) -> Result<T, Error> {
+    fn parse_api_response<T: serde::de::DeserializeOwned>(content: &str) -> Result<T, Error> {
         serde_json::from_str::<T>(content).map_err(|err| {
             // tracing::debug!("Trying to parse API response as Error ...");
             let res_api_error_cont = serde_json::from_str::<SearchError>(content);
@@ -326,7 +326,6 @@ both as the expected type and as an error response:\n{err}\n{err_err}"
         //     .await?;
 
         Self::parse_api_response::<SearchSuccess>(&res_raw_text)
-            .await
             .map(|success| success.hits[0].id)
     }
 
@@ -355,7 +354,6 @@ both as the expected type and as an error response:\n{err}\n{err_err}"
         .await?;
 
         Self::parse_api_response::<Thing>(&res_raw_text)
-            .await
             .map(|thing| (res_raw_text, thing))
     }
 }

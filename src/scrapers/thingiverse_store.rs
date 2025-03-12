@@ -478,12 +478,14 @@ can not be smaller then ({MIN_SLICE_SIZE})"
         Ok(res)
     }
 
-    /// Returns the number of total thing IDs in the stores range..
-    pub fn range(&self) -> ThingId {
+    /// Returns the number of total thing IDs in the stores range.
+    #[must_use]
+    pub const fn range(&self) -> ThingId {
         self.range_max - self.range_min + 1
     }
 
     /// Returns the number of total/maximum slices in the stores range.
+    #[must_use]
     pub fn total_slices(&self) -> ThingId {
         self.range() / self.slice_size
     }
