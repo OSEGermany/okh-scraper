@@ -21,24 +21,24 @@ use asyncgit::{sync::RepoPath, AsyncPull, FetchRequest};
 use crossbeam_channel::unbounded;
 use futures::{stream::BoxStream, stream::StreamExt};
 use git2::{build::RepoBuilder, FetchOptions, Repository};
-use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::Deserialize;
 use serde_json::Value;
+use std::sync::LazyLock;
 use std::{path::PathBuf, sync::Arc};
 use tracing::instrument;
 
-pub static SCRAPER_TYPE: Lazy<TypeInfo> = Lazy::new(|| TypeInfo {
+pub static SCRAPER_TYPE: LazyLock<TypeInfo> = LazyLock::new(|| TypeInfo {
     name: "manifests-repo",
     description: "Fetches a single git repository,
 and then scans it for manifest files.",
     hosting_type: HostingType::ManifestsRepo,
 });
 
-pub static RE_MANIFEST_FILE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)\.(toml|ya?ml|json)$").unwrap());
-// Lazy::new(|| Regex::new(r"^(?i)\.(toml$").unwrap());
+pub static RE_MANIFEST_FILE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\.(toml|ya?ml|json)$").unwrap());
+// LazyLock::new(|| Regex::new(r"^(?i)\.(toml$").unwrap());
 
 #[derive(Deserialize, Debug)]
 pub struct Config {

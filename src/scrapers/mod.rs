@@ -2,11 +2,14 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock},
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
-use once_cell::sync::Lazy;
 use reqwest::{
     header::{self, HeaderMap},
     Client,
@@ -38,7 +41,7 @@ pub mod thingiverse_store;
 const DEFAULT_RETRIES: u32 = 3;
 const DEFAULT_TIMEOUT: u64 = 10;
 
-pub static USER_AGENT_VALUE: Lazy<header::HeaderValue> = Lazy::new(|| {
+pub static USER_AGENT_VALUE: LazyLock<header::HeaderValue> = LazyLock::new(|| {
     "okh-scraper github.com/iop-alliance/OpenKnowHow"
         .parse()
         .unwrap()

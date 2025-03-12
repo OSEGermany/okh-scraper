@@ -6,8 +6,8 @@ use crate::scrapers::manifests_repo;
 
 use super::hosting_category;
 use hosting_category::HostingCategory;
-use once_cell::sync::Lazy;
 use std::fmt;
+use std::sync::LazyLock;
 
 #[derive(Debug, Clone, Copy)]
 pub enum NetworkTopology {
@@ -34,19 +34,19 @@ pub struct HostingTypeInfo {
     pub network_topology: NetworkTopology,
 }
 
-pub static HTI_APPROPEDIA: Lazy<HostingTypeInfo> = Lazy::new(|| HostingTypeInfo {
+pub static HTI_APPROPEDIA: LazyLock<HostingTypeInfo> = LazyLock::new(|| HostingTypeInfo {
     name: "Appropedia OSH Wiki",
     url: "https://appropedia.org/",
     network_topology: NetworkTopology::Centralized,
 });
 
-pub static HTI_MANIFESTS_REPO: Lazy<HostingTypeInfo> = Lazy::new(|| HostingTypeInfo {
+pub static HTI_MANIFESTS_REPO: LazyLock<HostingTypeInfo> = LazyLock::new(|| HostingTypeInfo {
     name: "Git repositories containing manifests",
     url: "https://git-scm.com",
     network_topology: NetworkTopology::Decentralized,
 });
 
-pub static HTI_OSHWA: Lazy<HostingTypeInfo> = Lazy::new(|| HostingTypeInfo {
+pub static HTI_OSHWA: LazyLock<HostingTypeInfo> = LazyLock::new(|| HostingTypeInfo {
     name: "OSHWA OSH Certification Platform",
     url: "https://certification.oshwa.org/",
     network_topology: NetworkTopology::Centralized,

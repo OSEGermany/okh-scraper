@@ -2,16 +2,14 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::LazyLock};
 
 use reqwest::header::HeaderValue;
 
 use urlencoding::encode;
 // use url::form_urlencoded;
 
-use once_cell::sync::Lazy;
-
-pub static USER_AGENT_VALUE: Lazy<HeaderValue> = Lazy::new(|| {
+pub static USER_AGENT_VALUE: LazyLock<HeaderValue> = LazyLock::new(|| {
     "okh-scraper github.com/iop-alliance/OpenKnowHow"
         .parse()
         .unwrap()

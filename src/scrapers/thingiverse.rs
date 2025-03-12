@@ -31,18 +31,18 @@ use chrono::{DateTime, Utc};
 use fs4::async_std::AsyncFileExt;
 use futures::{stream::BoxStream, stream::StreamExt};
 use governor::{Quota, RateLimiter};
-use once_cell::sync::Lazy;
 use reqwest::header::{HeaderMap, AUTHORIZATION, USER_AGENT};
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::LazyLock;
 use std::{borrow::Cow, fmt::Display, rc::Rc, sync::Arc};
 use tokio::time::Duration;
 use tracing::instrument;
 
 pub const HOSTING_PROVIDER_ID: HostingProviderId = HostingProviderId::ThingiverseCom;
 
-pub static SCRAPER_TYPE: Lazy<TypeInfo> = Lazy::new(|| TypeInfo {
+pub static SCRAPER_TYPE: LazyLock<TypeInfo> = LazyLock::new(|| TypeInfo {
     name: "thingiverse",
     description: "Scrapes projects from Thingiverse.com,
 (<https://thingiverse.com/>), via their API.",
@@ -52,7 +52,7 @@ pub static SCRAPER_TYPE: Lazy<TypeInfo> = Lazy::new(|| TypeInfo {
 /// This has to be static,
 /// because if we created multiple instances of [`Scraper`],
 /// we would send too many requests from the same network address.
-pub static RATE_LIMITER: Lazy<
+pub static RATE_LIMITER: LazyLock<
     Arc<
         RateLimiter<
             governor::state::NotKeyed,
@@ -61,7 +61,7 @@ pub static RATE_LIMITER: Lazy<
             governor::middleware::NoOpMiddleware<governor::clock::QuantaInstant>,
         >,
     >,
-> = Lazy::new(|| {
+> = LazyLock::new(|| {
     Arc::new(RateLimiter::direct(
         Quota::with_period(Duration::from_secs(1)).unwrap(),
     ))

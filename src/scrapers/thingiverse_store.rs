@@ -26,13 +26,13 @@ use chrono::{DateTime, Utc};
 use core::slice;
 use futures::{stream::BoxStream, stream::StreamExt};
 use governor::{Quota, RateLimiter};
-use once_cell::sync::Lazy;
 use reqwest::{
     header::{HeaderMap, AUTHORIZATION, USER_AGENT},
     Client,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::LazyLock;
 use std::{
     borrow::Cow,
     collections::{BTreeSet, HashMap, HashSet, VecDeque},
@@ -400,6 +400,7 @@ which does not add up to the slices size: {}",
 }
 
 /// A store of thing IDs in memory, with functions to read from and write to disk.
+///
 /// While on disc we (eventually) store the whole ranger of thing IDs on thingiverse,
 /// in memory we at most cover the range of thing IDs configured for the running scraper,
 /// and of these we only keep the meta info in memory, not the whole API result.

@@ -20,7 +20,6 @@ use async_stream::stream;
 use async_trait::async_trait;
 use futures::{stream::BoxStream, stream::StreamExt};
 use governor::{Quota, RateLimiter};
-use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest::{
     header::{HeaderMap, AUTHORIZATION, USER_AGENT},
@@ -28,13 +27,14 @@ use reqwest::{
 };
 use serde::Deserialize;
 use serde_json::Value;
+use std::sync::LazyLock;
 use std::{borrow::Cow, collections::HashMap, fmt::Display, rc::Rc, sync::Arc};
 use tokio::time::Duration;
 use tracing::instrument;
 
-pub static LICENSE_MAPPING: Lazy<
+pub static LICENSE_MAPPING: LazyLock<
     HashMap<&'static str, (Option<&'static str>, Option<&'static str>)>,
-> = Lazy::new(|| {
+> = LazyLock::new(|| {
     vec![
         (
             "Creative Commons - Attribution",
@@ -310,8 +310,8 @@ pub struct SearchError {
     pub error: t_string,
 }
 
-pub static RE_ERR_MSG_DOES_NOT_EXIST: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)^Thing (\d+) does not exist$").unwrap());
+pub static RE_ERR_MSG_DOES_NOT_EXIST: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)^Thing (\d+) does not exist$").unwrap());
 
 impl SearchError {
     pub fn is_thing_does_not_exist(&self) -> bool {

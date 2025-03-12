@@ -19,17 +19,17 @@ use crate::{
 use async_stream::stream;
 use async_trait::async_trait;
 use futures::{stream::BoxStream, stream::StreamExt};
-use once_cell::sync::Lazy;
 use reqwest::header::{HeaderMap, ACCEPT, USER_AGENT};
 use reqwest_middleware::ClientWithMiddleware;
 use serde::Deserialize;
 use serde_json::Value;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::sync::LazyLock;
 
 pub const HOSTING_PROVIDER_ID: HostingProviderId = HostingProviderId::AppropediaOrg;
 
-pub static SCRAPER_TYPE: Lazy<TypeInfo> = Lazy::new(|| TypeInfo {
+pub static SCRAPER_TYPE: LazyLock<TypeInfo> = LazyLock::new(|| TypeInfo {
     name: "appropedia",
     description: "Fetches projects from Appropedia (appropedia.org),
 (<https://appropedia.org/>).
