@@ -41,32 +41,6 @@ pub enum FindError {
     IoError(#[from] std::io::Error),
 }
 
-async fn finder(base: impl AsRef<Path>, file_name_pattern: Regex) -> BoxStream<'static, PathBuf> {
-    let mut filter = move |entry: DirEntry| {
-        let file_name_pattern = file_name_pattern.clone();
-        async move {
-            let path = entry.path();
-            let file_name_opt = path.file_name().and_then(OsStr::to_str);
-            if let Some(file_name) = file_name_opt {
-                if file_name_pattern.is_match(file_name) {
-                    return Filtering::Continue;
-                }
-            }
-            Filtering::Ignore
-        }
-    };
-
-    let mut entries = WalkDir::new(base).filter(filter);
-    entries
-        .into_stream()
-        .filter_map(async move |entry: Result<DirEntry, WDError>| {
-            entry
-                .ok()
-                .and_then(|arg0: async_walkdir::DirEntry| Some(DirEntry::path(&arg0)))
-        })
-        .boxed()
-}
-
 fn path_part_to_string(
     path_part_name: &'static str,
     path_part: &OsStr,
