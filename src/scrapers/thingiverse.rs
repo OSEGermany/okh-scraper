@@ -245,7 +245,6 @@ impl IScraper for Scraper {
                             } else {
                                 (ThingState::Proprietary, None)
                             }
-                            // (ThingState::FailedToFetch, Some(String::new()))
                         }
                     };
                     let thing_meta = ThingMeta::new(thing_id, state, fetch_time);
@@ -325,8 +324,7 @@ both as the expected type and as an error response:\n{err}\n{err_err}"
         //     .text()
         //     .await?;
 
-        Self::parse_api_response::<SearchSuccess>(&res_raw_text)
-            .map(|success| success.hits[0].id)
+        Self::parse_api_response::<SearchSuccess>(&res_raw_text).map(|success| success.hits[0].id)
     }
 
     #[instrument]
@@ -353,7 +351,6 @@ both as the expected type and as an error response:\n{err}\n{err_err}"
         )
         .await?;
 
-        Self::parse_api_response::<Thing>(&res_raw_text)
-            .map(|thing| (res_raw_text, thing))
+        Self::parse_api_response::<Thing>(&res_raw_text).map(|thing| (res_raw_text, thing))
     }
 }

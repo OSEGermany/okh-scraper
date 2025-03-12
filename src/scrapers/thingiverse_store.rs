@@ -357,11 +357,8 @@ we require the content of the thing, put it was not provided",
         for state in ThingState::iter() {
             let file_path = self.meta_file_path(state, false);
             if (file_path.exists().await) {
-                // let mut rdr = csv::Reader::from_path(&self.meta_file_path(false))?;
                 let mut rdr =
                     csv_async::AsyncDeserializer::from_reader(fs::File::open(&file_path).await?);
-                // for record in rdr.deserialize() {
-                // let thing_meta: ThingMeta = record?;
                 let mut records = rdr.deserialize::<ThingMeta>();
                 while let Some(record) = records.next().await {
                     let thing_meta: ThingMeta = record?;
