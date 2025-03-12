@@ -163,7 +163,7 @@ impl IScraper for Scraper {
             if let Err(err) = repo_clone_res {
                 tracing::error!("Error while pulling '{fetch_url}': {err:?}");
                 return stream! {
-                    yield Err(err.into());
+                    yield Err(err);
                 }
                 .boxed();
             }
