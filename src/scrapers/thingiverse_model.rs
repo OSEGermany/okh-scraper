@@ -32,9 +32,11 @@ use std::{borrow::Cow, collections::HashMap, fmt::Display, rc::Rc, sync::Arc};
 use tokio::time::Duration;
 use tracing::instrument;
 
-pub static LICENSE_MAPPING: LazyLock<
-    HashMap<&'static str, (Option<&'static str>, Option<&'static str>)>,
-> = LazyLock::new(|| {
+struct LicenseId {
+    pub thingiverse_short: Option<&'static str>,
+    pub spdx: Option<&'static str>,
+}
+pub static LICENSE_MAPPING: LazyLock<HashMap<&'static str, LicenseId>> = LazyLock::new(|| {
     vec![
         (
             "Creative Commons - Attribution",
@@ -89,6 +91,15 @@ pub static LICENSE_MAPPING: LazyLock<
         ("None", (None, None)),
     ]
     .into_iter()
+    .map(|(tv_long, (thingiverse_short, spdx))| {
+        (
+            tv_long,
+            LicenseId {
+                thingiverse_short,
+                spdx,
+            },
+        )
+    })
     .collect()
 });
 
@@ -320,13 +331,12 @@ impl SearchError {
     }
 
     pub fn get_thing_id_if_not_exists(&self) -> Option<ThingId> {
-        if let Some(re_match) = RE_ERR_MSG_DOES_NOT_EXIST.captures(&self.error) {
-            // let id_str = self.error.remove_matches("Thing ").remove_matches(" does not exist");
-            let id_str = re_match.get(1).unwrap().as_str();
-            id_str.parse().ok()
-        } else {
-            None
-        }
+        RE_ERR_MSG_DOES_NOT_EXIST
+            .captures(&self.error)
+            .and_then(|re_match| {
+                let id_str = re_match.get(1).unwrap().as_str();
+                id_str.parse().ok()
+            })
     }
 }
 
@@ -591,7 +601,7 @@ impl Thing {
 
         let mapped_license_opt = LICENSE_MAPPING.get(license_raw.as_str());
         mapped_license_opt
-            .and_then(|(_short_license, spdx_license)| spdx_license.as_deref())
+            .and_then(|license_id| license_id.spdx)
             .map(std::borrow::ToOwned::to_owned)
     }
 }

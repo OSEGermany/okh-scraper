@@ -40,16 +40,7 @@ pub static SCRAPER_TYPE: LazyLock<TypeInfo> = LazyLock::new(|| TypeInfo {
 /// This has to be static,
 /// because if we created multiple instances of [`Scraper`],
 /// we would send too many requests from the same network address.
-pub static RATE_LIMITER: LazyLock<
-    Arc<
-        RateLimiter<
-            governor::state::NotKeyed,
-            governor::state::InMemoryState,
-            governor::clock::QuantaClock,
-            governor::middleware::NoOpMiddleware<governor::clock::QuantaInstant>,
-        >,
-    >,
-> = LazyLock::new(|| {
+pub static RATE_LIMITER: LazyLock<Arc<super::RL>> = LazyLock::new(|| {
     Arc::new(RateLimiter::direct(
         Quota::with_period(Duration::from_secs(5)).unwrap(),
     ))

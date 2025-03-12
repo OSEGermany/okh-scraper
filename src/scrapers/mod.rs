@@ -38,6 +38,13 @@ pub mod thingiverse;
 pub mod thingiverse_model;
 pub mod thingiverse_store;
 
+pub type RL = governor::RateLimiter<
+    governor::state::NotKeyed,
+    governor::state::InMemoryState,
+    governor::clock::QuantaClock,
+    governor::middleware::NoOpMiddleware<governor::clock::QuantaInstant>,
+>;
+
 const DEFAULT_RETRIES: u32 = 3;
 const DEFAULT_TIMEOUT: u64 = 10;
 

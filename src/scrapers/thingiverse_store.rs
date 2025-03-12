@@ -74,7 +74,7 @@ fn last_scrape_file<P: AsRef<Path>>(dir: P, temp: bool) -> PathBuf {
     construct_file_path(dir, LAST_SCRAPE_FILE_NAME, temp)
 }
 
-async fn write_last_scrape<P: AsRef<Path>>(
+async fn write_last_scrape<P: AsRef<Path> + Send>(
     temp_file: P,
     file: P,
     last_scrape: DateTime<Utc>,
@@ -141,13 +141,10 @@ impl ThingState {
         }
     }
 
-    const fn is_successful_fetch(&self) -> bool {
+    const fn is_successful_fetch(self) -> bool {
         match self {
-            Self::FailedToFetch => false,
-            Self::DoesNotExist => false,
-            Self::Proprietary => true,
-            Self::OpenSource => true,
-            Self::Untried => false,
+            Self::FailedToFetch | Self::DoesNotExist | Self::Untried => false,
+            Self::Proprietary | Self::OpenSource => true,
         }
     }
 }
@@ -159,7 +156,7 @@ impl Display for ThingState {
 }
 
 /// What we store for every thing ID.
-#[derive(Serialize, Deserialize, Debug, Eq, Ord)]
+#[derive(Serialize, Deserialize, Debug, Eq)]
 pub struct ThingMeta {
     id: ThingId,
     state: ThingState,
@@ -258,13 +255,19 @@ impl PartialEq for ThingMeta {
     }
 }
 
-impl PartialOrd for ThingMeta {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match self.state.partial_cmp(&other.state) {
-            Some(core::cmp::Ordering::Equal) => {}
+impl Ord for ThingMeta {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self.state.cmp(&other.state) {
+            core::cmp::Ordering::Equal => {}
             ord => return ord,
         }
-        self.last_scrape.partial_cmp(&other.last_scrape)
+        self.last_scrape.cmp(&other.last_scrape)
+    }
+}
+
+impl PartialOrd for ThingMeta {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 

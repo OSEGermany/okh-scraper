@@ -52,16 +52,7 @@ pub static SCRAPER_TYPE: LazyLock<TypeInfo> = LazyLock::new(|| TypeInfo {
 /// This has to be static,
 /// because if we created multiple instances of [`Scraper`],
 /// we would send too many requests from the same network address.
-pub static RATE_LIMITER: LazyLock<
-    Arc<
-        RateLimiter<
-            governor::state::NotKeyed,
-            governor::state::InMemoryState,
-            governor::clock::QuantaClock,
-            governor::middleware::NoOpMiddleware<governor::clock::QuantaInstant>,
-        >,
-    >,
-> = LazyLock::new(|| {
+pub static RATE_LIMITER: LazyLock<Arc<super::RL>> = LazyLock::new(|| {
     Arc::new(RateLimiter::direct(
         Quota::with_period(Duration::from_secs(1)).unwrap(),
     ))
@@ -102,10 +93,12 @@ pub struct ThingiverseConfig {
     things_range_max: Option<ThingId>,
 }
 
+#[allow(clippy::unnecessary_wraps)]
 const fn thing_id_min() -> Option<ThingId> {
     Some(ThingId::MIN)
 }
 
+#[allow(clippy::unnecessary_wraps)]
 const fn thing_id_max() -> Option<ThingId> {
     Some(ThingId::MAX)
 }
@@ -264,7 +257,7 @@ impl IScraper for Scraper {
 
 impl Scraper {
     // #[instrument]
-    async fn fetch_as_text<P: Serialize + ?Sized + std::fmt::Debug>(
+    async fn fetch_as_text<P: Serialize + ?Sized + Send + Sync + std::fmt::Debug>(
         client: Arc<ClientWithMiddleware>,
         url: &str,
         params: &P,
@@ -319,7 +312,7 @@ both as the expected type and as an error response:\n{err}\n{err_err}"
         //     .text()
         //     .await?;
 
-        Self::parse_api_response::<SearchSuccess>(&res_raw_text).map(|success| success.hits[0].id)
+        Self::parse_api_response::<SearchSuccess>(&res_raw_text).map(|success| success.hits.first().expect("No hits returned when fetching latest thing from thingiverse.com - this should never happen").id)
     }
 
     #[instrument]
