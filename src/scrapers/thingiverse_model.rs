@@ -459,7 +459,7 @@ pub struct Thing {
     pub thumbnail: t_url,
     pub url: t_url,
     pub public_url: t_url,
-    pub creator: Person,
+    pub creator: Option<Person>,
     pub added: Option<t_datetime>,
     pub modified: Option<t_datetime>,
     pub is_published: Int,
