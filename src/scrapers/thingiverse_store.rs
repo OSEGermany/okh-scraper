@@ -138,6 +138,16 @@ impl ThingState {
             Self::Untried => "untried",
         }
     }
+
+    const fn is_successful_fetch(&self) -> bool {
+        match self {
+            Self::FailedToFetch => false,
+            Self::DoesNotExist => false,
+            Self::Proprietary => true,
+            Self::OpenSource => true,
+            Self::Untried => false,
+        }
+    }
 }
 
 impl Display for ThingState {
@@ -151,10 +161,44 @@ impl Display for ThingState {
 pub struct ThingMeta {
     id: ThingId,
     state: ThingState,
-    // license: String,
-    first_scrape: DateTime<Utc>,
-    last_scrape: DateTime<Utc>,
-    last_change: DateTime<Utc>,
+    /// The first time we scraped this thing
+    /// and got either a success or an error return.
+    ///
+    /// This will not be set if there was a network error,
+    /// for example.
+    #[serde(default)]
+    first_scrape: Option<DateTime<Utc>>,
+    /// The last time we scraped this thing
+    /// and got either a success or an error return.
+    ///
+    /// This will not be set if there was a network error,
+    /// for example.
+    #[serde(default)]
+    last_scrape: Option<DateTime<Utc>>,
+    /// The last time we scraped this thing
+    /// and got either success return.
+    ///
+    /// This includes both open source and proprietary results.
+    #[serde(default)]
+    last_successful_scrape: Option<DateTime<Utc>>,
+    /// When did we last detect a change
+    /// in the content returned by the API.
+    ///
+    /// This will coincide with a scrape-time,
+    /// and not reflect the actual moment in time it changed,
+    /// which is almost certainly earlier.
+    #[serde(default)]
+    last_change: Option<DateTime<Utc>>,
+    /// How many times we tried to scrape.
+    ///
+    /// This includes any attempt,
+    /// even if there was a network error, for example.
+    #[serde(default)]
+    attempted_scrapes: usize,
+    /// How many times we recorded changes
+    /// in the content returned by the API.
+    ///
+    /// This will be at most [`Self::attempted_scrapes`] - 1.
     scraped_changes: usize,
 }
 
@@ -163,10 +207,35 @@ impl ThingMeta {
         Self {
             id,
             state,
-            first_scrape,
-            last_scrape: earliest(),
-            last_change: earliest(),
+            first_scrape: Some(first_scrape),
+            last_scrape: None,
+            last_successful_scrape: if state.is_successful_fetch() {
+                Some(first_scrape)
+            } else {
+                None
+            },
+            last_change: None,
+            attempted_scrapes: 1,
             scraped_changes: 0,
+        }
+    }
+
+    pub fn normalize(&mut self) {
+        let earliest = earliest();
+        if let Some(first_scrape) = self.first_scrape {
+            if first_scrape == earliest {
+                self.first_scrape = None;
+            }
+        }
+        if let Some(last_scrape) = self.last_scrape {
+            if last_scrape == earliest {
+                self.last_scrape = None;
+            }
+        }
+        if let Some(last_change) = self.last_change {
+            if last_change == earliest {
+                self.last_change = None;
+            }
         }
     }
 
@@ -361,7 +430,8 @@ we require the content of the thing, put it was not provided",
                     csv_async::AsyncDeserializer::from_reader(fs::File::open(&file_path).await?);
                 let mut records = rdr.deserialize::<ThingMeta>();
                 while let Some(record) = records.next().await {
-                    let thing_meta: ThingMeta = record?;
+                    let mut thing_meta: ThingMeta = record?;
+                    thing_meta.normalize();
                     untried.remove(&thing_meta.id);
                     self.meta
                         .get_mut(&thing_meta.state)
