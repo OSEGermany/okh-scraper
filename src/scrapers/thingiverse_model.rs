@@ -8,8 +8,10 @@ use super::{
 };
 use crate::{
     model::{
-        hosting_provider_id::HostingProviderId, hosting_type::HostingType,
-        hosting_unit_id::HostingUnitId, project::Project,
+        hosting_provider_id::HostingProviderId,
+        hosting_type::HostingType,
+        hosting_unit_id::{HostingUnitId, HostingUnitIdWebById},
+        project::Project,
     },
     settings::PartialSettings,
     tools::{SpdxLicenseExpression, LICENSE_UNKNOWN, USER_AGENT_VALUE},
@@ -19,6 +21,7 @@ use async_trait::async_trait;
 use futures::{stream::BoxStream, stream::StreamExt};
 use governor::{Quota, RateLimiter};
 use once_cell::sync::Lazy;
+use regex::Regex;
 use reqwest::{
     header::{HeaderMap, AUTHORIZATION, USER_AGENT},
     Client,
@@ -307,6 +310,39 @@ pub struct SearchError {
     pub error: t_string,
 }
 
+pub static RE_ERR_MSG_DOES_NOT_EXIST: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)^Thing (\d+) does not exist$").unwrap());
+
+impl SearchError {
+    pub fn is_thing_does_not_exist(&self) -> bool {
+        RE_ERR_MSG_DOES_NOT_EXIST.is_match(self.error.as_str())
+        // self.error.starts_with("Thing ") && self.error.ends_with(" does not exist")
+    }
+
+    pub fn get_thing_id_if_not_exists(&self) -> Option<ThingId> {
+        if let Some(re_match) = RE_ERR_MSG_DOES_NOT_EXIST.captures(&self.error) {
+            // let id_str = self.error.remove_matches("Thing ").remove_matches(" does not exist");
+            let id_str = re_match.get(1).unwrap().as_str();
+            id_str.parse().ok()
+        } else {
+            None
+        }
+    }
+}
+
+impl From<SearchError> for Error {
+    fn from(other: SearchError) -> Self {
+        if let Some(thing_id) = other.get_thing_id_if_not_exists() {
+            Error::ProjectDoesNotExist(HostingUnitId::WebById(HostingUnitIdWebById::from_parts(
+                HostingProviderId::ThingiverseCom,
+                thing_id.to_string(),
+            )))
+        } else {
+            Error::HostingApiMsg(other.error)
+        }
+    }
+}
+
 impl Display for SearchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.error.fmt(f)
@@ -322,7 +358,7 @@ pub struct SearchSuccess {
 }
 
 #[derive(Deserialize, Debug)]
-struct Person {
+pub struct Person {
     pub id: usize,
     pub name: t_string,
     pub first_name: t_string,
@@ -345,14 +381,14 @@ struct Person {
 }
 
 #[derive(Deserialize, Debug)]
-struct ImageSize {
+pub struct ImageSize {
     pub r#type: t_string,
     pub size: t_string,
     pub url: t_url,
 }
 
 #[derive(Deserialize, Debug)]
-struct Image {
+pub struct Image {
     pub id: Int,
     pub url: t_url,
     pub name: t_string,
@@ -361,7 +397,20 @@ struct Image {
 }
 
 #[derive(Deserialize, Debug)]
-struct Tag {
+pub struct PartDatum {
+    pub content: t_string,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct PartDetails {
+    pub r#type: t_string,
+    pub name: t_string,
+    // pub required: Option<t_string>, // TODO FIXME this can be either string or bool :/
+    pub data: Option<Vec<PartDatum>>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Tag {
     pub name: t_string,
     pub url: t_url,
     pub count: Int,
@@ -370,15 +419,15 @@ struct Tag {
 }
 
 #[derive(Deserialize, Debug)]
-struct ZipFile {
+pub struct ZipFile {
     pub name: t_string,
     pub url: t_url,
 }
 
 #[derive(Deserialize, Debug)]
-struct ZipData {
-    pub files: Vec<ZipFile>,
-    pub images: Vec<ZipFile>,
+pub struct ZipData {
+    pub files: Option<Vec<ZipFile>>,
+    pub images: Option<Vec<ZipFile>>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -389,59 +438,142 @@ pub struct Thing {
     pub url: t_url,
     pub public_url: t_url,
     pub creator: Person,
-    pub added: t_datetime,
-    pub modified: t_datetime,
+    pub added: Option<t_datetime>,
+    pub modified: Option<t_datetime>,
     pub is_published: Int,
-    pub is_wip: Int,
+    pub is_wip: Option<Int>,
     pub is_featured: bool,
-    pub is_nsfw: bool,
+    pub is_nsfw: Option<bool>,
     pub is_ai: bool,
     pub like_count: Int,
-    pub is_liked: bool,
+    pub is_liked: Option<bool>,
     pub collect_count: Int,
-    pub is_collected: bool,
+    pub is_collected: Option<bool>,
     pub comment_count: Int,
-    pub is_watched: bool,
-    pub default_image: Image,
-    pub description: t_string,
+    pub is_watched: Option<bool>,
+    pub default_image: Option<Image>,
+    pub description: Option<t_string>,
     pub instructions: Option<t_string>,
-    pub description_html: t_string,
-    pub instructions_html: t_string,
-    pub details: t_string,
-    pub details_parts: Vec<HashMap<t_string, t_string>>,
+    pub description_html: Option<t_string>,
+    pub instructions_html: Option<t_string>,
+    pub details: Option<t_string>,
+    pub details_parts: Option<Vec<PartDetails>>,
     pub edu_details: Option<t_string>,
-    pub edu_details_parts: Vec<HashMap<t_string, t_string>>,
+    pub edu_details_parts: Option<Vec<PartDetails>>,
     pub license: Option<t_string>,
-    pub allows_derivatives: bool,
-    pub files_url: t_url,
-    pub images_url: t_url,
-    pub likes_url: t_url,
-    pub ancestors_url: t_url,
-    pub derivatives_url: t_url,
-    pub tags_url: t_string,
+    pub allows_derivatives: Option<bool>,
+    pub files_url: Option<t_url>,
+    pub images_url: Option<t_url>,
+    pub likes_url: Option<t_url>,
+    pub ancestors_url: Option<t_url>,
+    pub derivatives_url: Option<t_url>,
+    pub tags_url: Option<t_string>,
     pub tags: Vec<Tag>,
-    pub categories_url: t_url,
-    pub file_count: Int,
-    pub is_purchased: Int,
+    pub categories_url: Option<t_url>,
+    pub file_count: Option<Int>,
+    pub is_purchased: Option<Int>,
     pub app_id: Option<t_string>,
-    pub download_count: Int,
-    pub view_count: Int,
-    pub education: HashMap<t_string, t_string>, // TODO check if correct/required/works
-    pub remix_count: Int,
-    pub make_count: Int,
-    pub app_count: Int,
-    pub root_comment_count: Int,
+    pub download_count: Option<Int>,
+    pub view_count: Option<Int>,
+    pub education: Option<HashMap<t_string, Value>>,
+    pub remix_count: Option<Int>,
+    pub make_count: Option<Int>,
+    pub app_count: Option<Int>,
+    pub root_comment_count: Option<Int>,
     pub moderation: Option<t_string>,
-    pub is_derivative: bool,
-    pub ancestors: Vec<t_string>, // TODO check if correct/required/works
-    pub can_comment: bool,
-    pub type_name: t_string,
+    pub is_derivative: Option<bool>,
+    pub ancestors: Option<Vec<Value>>,
+    // pub can_comment: Option<bool>,
+    pub type_name: Option<t_string>,
     pub is_banned: bool,
-    pub is_comments_disabled: bool,
-    pub needs_moderation: Int,
-    pub is_decoy: Int,
-    pub zip_data: ZipData,
+    pub is_comments_disabled: Option<bool>,
+    pub needs_moderation: Option<Int>,
+    pub is_decoy: Option<Int>,
+    pub zip_data: Option<ZipData>,
 }
+
+// {
+//     "total": 10000,
+//     "hits": [
+//       {
+//         "id": 6975184,
+//         "name": "Trump-Poetin",
+//         "url": "https://api.thingiverse.com/things/6975184",
+//         "public_url": "https://www.thingiverse.com/thing:6975184",
+//         "created_at": "2025-03-10T20:12:44+00:00",
+//         "thumbnail": "https://cdn.thingiverse.com/site/img/default/Gears_thumb_medium.jpg",
+//         "preview_image": "https://cdn.thingiverse.com/site/img/default/Gears_preview_card.jpg",
+//         "creator": {
+//           "id": 644360,
+//           "name": "adv51",
+//           "first_name": "albert",
+//           "last_name": "de vries",
+//           "url": "https://api.thingiverse.com/users/adv51",
+//           "public_url": "https://www.thingiverse.com/adv51",
+//           "thumbnail": "https://cdn.thingiverse.com/renders/9e/97/79/26/c0/156005c5baf40ff51a327f1c34f2975b_thumb_medium.jpg",
+//           "count_of_followers": 19,
+//           "count_of_following": 16,
+//           "count_of_designs": 56,
+//           "collection_count": 4,
+//           "make_count": 44,
+//           "accepts_tips": true,
+//           "is_following": false,
+//           "location": "Netherlands",
+//           "cover": "https://cdn.thingiverse.com/site/img/default/cover/cover-10_preview_large.jpg",
+//           "is_admin": false,
+//           "is_moderator": false,
+//           "is_featured": false,
+//           "is_verified": false
+//         },
+//         "is_private": 0,
+//         "is_purchased": 0,
+//         "is_published": 1,
+//         "is_featured": false,
+//         "is_edu_approved": null,
+//         "is_printable": false,
+//         "is_winner": false,
+//         "allows_derivatives": true,
+//         "comment_count": 0,
+//         "make_count": 0,
+//         "like_count": 0,
+//         "tags": [
+//           {
+//             "name": "2D-art",
+//             "tag": "2d-art",
+//             "url": "https://api.thingiverse.com/tags/2d-art",
+//             "count": 7,
+//             "things_url": "https://api.thingiverse.com/tags/2d-art/things",
+//             "absolute_url": "/tag:2D-art"
+//           },
+//           {
+//             "name": "Poetin",
+//             "tag": "poetin",
+//             "url": "https://api.thingiverse.com/tags/poetin",
+//             "count": 1,
+//             "things_url": "https://api.thingiverse.com/tags/poetin/things",
+//             "absolute_url": "/tag:Poetin"
+//           },
+//           {
+//             "name": "TRUMP_",
+//             "tag": "trump_",
+//             "url": "https://api.thingiverse.com/tags/trump_",
+//             "count": 9,
+//             "things_url": "https://api.thingiverse.com/tags/trump_/things",
+//             "absolute_url": "/tag:TRUMP_"
+//           }
+//         ],
+//         "is_nsfw": null,
+//         "is_ai": false,
+//         "rank": null,
+//         "collect_count": 0,
+//         "moderation": "",
+//         "is_banned": false,
+//         "needs_moderation": 0,
+//         "is_decoy": 0,
+//         "is_comments_disabled": false
+//       }
+//     ]
+//   }
 
 impl Thing {
     pub fn is_open_source(&self) -> bool {

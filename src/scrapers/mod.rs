@@ -20,8 +20,10 @@ use thiserror::Error;
 use crate::{
     files_finder,
     model::{
-        hosting_provider_id::HostingProviderId, hosting_type::HostingType, hosting_unit_id,
-        project::Project,
+        hosting_provider_id::HostingProviderId,
+        hosting_type::HostingType,
+        hosting_unit_id::{self, HostingUnitId},
+        project::{Project, ProjectId},
     },
     settings::PartialSettings,
 };
@@ -186,8 +188,10 @@ pub enum Error {
     DeserializeFailed(#[from] serde_json::Error),
     #[error("OSHWA API returned error content: {0}")]
     OshwaApiError(#[from] oshwa::ApiError), // TODO Really, we should not have such scraper-specific errors here
-    #[error("Thingiverse search API returned error: {0}")]
-    ThingiverseSearchError(#[from] thingiverse_model::SearchError), // TODO Really, we should not have such scraper-specific errors here
+    #[error("Hosting technology (e.g. platform) API returned error: {0}")]
+    HostingApiMsg(String),
+    #[error("Project that was tired to scrape does not exist: {0}")]
+    ProjectDoesNotExist(HostingUnitId),
     #[error("Failed to parse a hosting URL to a hosting-unit-id: {0}")]
     HostingUnitIdParseError(#[from] hosting_unit_id::ParseError),
     #[error("Failed pull git repo (asynchronously): {0}")]
@@ -228,6 +232,12 @@ pub trait Scraper {
     fn info(&self) -> &'static TypeInfo;
 
     async fn fetch_all(&self) -> BoxStream<'static, Result<Project, Error>>;
+}
+
+impl std::fmt::Display for dyn Scraper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-scraper", self.info().name)
+    }
 }
 
 /// Creates a default set of headers for downloads.

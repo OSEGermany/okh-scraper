@@ -34,7 +34,7 @@ use governor::{Quota, RateLimiter};
 use once_cell::sync::Lazy;
 use reqwest::header::{HeaderMap, AUTHORIZATION, USER_AGENT};
 use reqwest_middleware::ClientWithMiddleware;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{borrow::Cow, fmt::Display, rc::Rc, sync::Arc};
 use tokio::time::Duration;
@@ -170,11 +170,9 @@ impl IScraper for Scraper {
     }
 
     async fn fetch_all(&self) -> BoxStream<'static, Result<Project, Error>> {
-        // let client: Arc<Mutex<reqwest::Client>> = Arc::new(Mutex::new(reqwest::Client::new()));
-        // let client = reqwest::Client::new();
-        let access_token = self.config.access_token.clone();
+        let client = Arc::<_>::clone(&self.downloader);
 
-        let latest_thing_id = match self.fetch_latest_thing_id().await {
+        let latest_thing_id = match Self::fetch_latest_thing_id(client.clone()).await {
             Err(err) => {
                 tracing::error!("Failed to fetch latest thing-ID: {err}");
                 ok_or_return_err_stream!(Err(err));
@@ -214,15 +212,13 @@ impl IScraper for Scraper {
         let mut store = ok_or_return_err_stream!(store_res);
 
         tracing::info!("Fetching {} - total ...", self.info().name);
-
-        let client = Arc::<_>::clone(&self.downloader);
         stream! {
             yield Err(io::Error::new(io::ErrorKind::InvalidData,
                 format!("tst")).into());
             loop {
                 let mut store_slice = store.get_next_slice().await?;
-                let store_slice = Arc::get_mut(&mut store_slice).unwrap();
-                let previously_os_things = store_slice.cloned_os();
+                let mut store_slice = store_slice.write().await;
+                let previously_os_things = store_slice.cloned_os(); // TODO Once we have an initial scrape, we should implement scraping these again, after this loop that scraped the yet untried
                 while let Some(thing_meta) = store_slice.next(ThingState::Untried) {
                     let thing_id = thing_meta.get_id();
                     // We want this time to be as close as possible to the fetch,
@@ -231,8 +227,16 @@ impl IScraper for Scraper {
                     let (state, raw_api_response) = match Self::fetch_thing(client.clone(), thing_id).await {
                     // let (state, raw_api_response) = match Ok::<(String, &str), Error>(("".to_string(), "")) {
                         Err(err) => {
-                            tracing::error!("Failed to fetch thing-ID {thing_id}: {err}");
-                            (ThingState::FailedToFetch, None)
+                            match err {
+                                Error::ProjectDoesNotExist(_) => {
+                                    tracing::info!("Thing {thing_id} does not exist");
+                                    (ThingState::DoesNotExist, None)
+                                },
+                                _ => {
+                                    tracing::error!("Failed to fetch thing-ID {thing_id}: {err}");
+                                    (ThingState::FailedToFetch, None)
+                                }
+                            }
                         },
                         Ok((raw_api_response, parsed_as_thing)) => {
                             let is_os = parsed_as_thing.is_open_source();
@@ -251,10 +255,10 @@ impl IScraper for Scraper {
                     store.set_last_scrape(fetch_time);
                     if let Some(raw_api_response_val) = raw_api_response {
                         let mut project = Project::new(HostingUnitId::WebById(HostingUnitIdWebById::from_parts(
-                            HostingProviderId::ThingiverseCom,
+                            HOSTING_PROVIDER_ID,
                             thing_id.to_string())
                         ));
-                        project.crawling_meta_tree = todo!(); // TODO Set meta-data!
+                        // project.crawling_meta_tree = todo!(); // TODO FIXME Set meta-data!
                         project.raw = Some(Chunk::from_content(SerializationFormat::Json, RawContent::String(raw_api_response_val)));
                         yield Ok(project);
                     }
@@ -265,34 +269,65 @@ impl IScraper for Scraper {
 }
 
 impl Scraper {
-    #[instrument]
-    async fn fetch_latest_thing_id(&self) -> Result<ThingId, Error> {
-        tracing::info!("Fetching latest thing ID ...");
-
-        let params = [("type", "things"), ("per_page", "1"), ("sort", "newest")];
-        let client = Arc::<_>::clone(&self.downloader);
-        let res_raw_json = client
+    // #[instrument]
+    async fn fetch_as_text<P: Serialize + ?Sized + std::fmt::Debug>(
+        client: Arc<ClientWithMiddleware>,
+        url: &str,
+        params: &P,
+    ) -> Result<String, Error> {
+        let rate_limiter = Arc::<_>::clone(&RATE_LIMITER);
+        rate_limiter.until_ready().await;
+        Ok(client
             // .lock()
             // .unwrap()
-            .get("https://api.thingiverse.com/search/")
+            .get(url)
             .query(&params)
             .send()
             .await?
-            .json::<Value>()
-            .await?;
+            .text()
+            .await?)
+    }
 
-        serde_json::from_value::<SearchSuccess>(res_raw_json.clone())
-            .map(|success| success.hits[0].id)
-            .map_err(|_err| {
-                tracing::debug!(
-                    "Trying to parse Thingiverse (supposed) error JSON return:\n{res_raw_json}"
-                );
-                let res_api_error_cont = serde_json::from_value::<SearchError>(res_raw_json);
-                match res_api_error_cont {
-                    Err(deserialize_err) => deserialize_err.into(),
-                    Ok(api_error_cont) => api_error_cont.into(),
+    // #[instrument]
+    async fn parse_api_response<T: serde::de::DeserializeOwned>(content: &str) -> Result<T, Error> {
+        serde_json::from_str::<T>(content).map_err(|err| {
+            // tracing::debug!("Trying to parse API response as Error ...");
+            let res_api_error_cont = serde_json::from_str::<SearchError>(content);
+            match res_api_error_cont {
+                Err(err_err) => {
+                    tracing::warn!(
+                        "Failed to parse Thingiverse API response (assumed JSON), \
+both as the expected type and as an error response:\n{err}\n{err_err}"
+                    );
+                    tracing::warn!("... raw, (assumed JSON) value:\n{content}");
+                    err.into()
+                    // err_err.into()
                 }
-            })
+                Ok(api_error_cont) => api_error_cont.into(),
+            }
+        })
+    }
+
+    // #[instrument]
+    async fn fetch_latest_thing_id(client: Arc<ClientWithMiddleware>) -> Result<ThingId, Error> {
+        tracing::info!("Fetching latest thing ID ...");
+
+        let params = [("type", "things"), ("per_page", "1"), ("sort", "newest")];
+        let res_raw_text =
+            Self::fetch_as_text(client, "https://api.thingiverse.com/search/", &params).await?;
+        // let res_raw_text = client
+        //     // .lock()
+        //     // .unwrap()
+        //     .get("https://api.thingiverse.com/search/")
+        //     .query(&params)
+        //     .send()
+        //     .await?
+        //     .text()
+        //     .await?;
+
+        Self::parse_api_response::<SearchSuccess>(&res_raw_text)
+            .await
+            .map(|success| success.hits[0].id)
     }
 
     #[instrument]
@@ -303,26 +338,24 @@ impl Scraper {
     ) -> Result<(String, Thing), Error> {
         tracing::info!("Fetching thing {thing_id} ...");
         // let client = Arc::<_>::clone(&self.downloader);
-        let response = client
-            // .lock()
-            // .unwrap()
-            .get(&format!("https://api.thingiverse.com/things/{thing_id}"))
-            .send()
-            .await?;
-        let res_raw_text = response.text().await?;
-        // let res_raw_json = response.json::<Value>().await?;
+        // let res_raw_text = client
+        //     // .lock()
+        //     // .unwrap()
+        //     .get(&format!("https://api.thingiverse.com/things/{thing_id}"))
+        //     .send()
+        //     .await?
+        //     .text()
+        //     .await?;
+        let params: [(&str, &str); 0] = [];
+        let res_raw_text = Self::fetch_as_text(
+            client,
+            &format!("https://api.thingiverse.com/things/{thing_id}"),
+            &params,
+        )
+        .await?;
 
-        serde_json::from_str::<Thing>(&res_raw_text)
-            .map_err(|_err| {
-                tracing::debug!(
-                    "Trying to parse Thingiverse (supposed) error JSON return:\n{res_raw_text}"
-                );
-                let res_api_error_cont = serde_json::from_str::<SearchError>(&res_raw_text);
-                match res_api_error_cont {
-                    Err(deserialize_err) => deserialize_err.into(),
-                    Ok(api_error_cont) => api_error_cont.into(),
-                }
-            })
+        Self::parse_api_response::<Thing>(&res_raw_text)
+            .await
             .map(|thing| (res_raw_text, thing))
     }
 }

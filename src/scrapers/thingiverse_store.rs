@@ -18,6 +18,7 @@ use async_std::{
     fs::{self, File},
     io,
     path::{Path, PathBuf},
+    sync,
 };
 use async_stream::stream;
 use async_trait::async_trait;
@@ -109,8 +110,9 @@ async fn read_last_scrape<P: AsRef<Path>>(file: P) -> io::Result<Option<DateTime
 pub enum ThingState {
     /// There was some kind of error when trying to fetch the thing.
     FailedToFetch,
-    /// The thing once existed, but is now deleted on Thingiverse.
-    Deleted,
+    /// The thing once existed, but is now deleted,
+    /// or directly never existed on Thingiverse.
+    DoesNotExist,
     /// The thing exists, but has a proprietary license.
     Proprietary,
     /// The thing exists, and has an Open Source license.
@@ -122,7 +124,7 @@ pub enum ThingState {
 impl ThingState {
     pub fn has_content(self) -> bool {
         match self {
-            Self::FailedToFetch | Self::Deleted | Self::Proprietary | Self::Untried => false,
+            Self::FailedToFetch | Self::DoesNotExist | Self::Proprietary | Self::Untried => false,
             Self::OpenSource => true,
         }
     }
@@ -130,7 +132,7 @@ impl ThingState {
     pub fn to_str(self) -> &'static str {
         match self {
             Self::FailedToFetch => "failed_to_fetch",
-            Self::Deleted => "deleted",
+            Self::DoesNotExist => "does_not_exist",
             Self::Proprietary => "proprietary",
             Self::OpenSource => "open_source",
             Self::Untried => "untried",
@@ -196,6 +198,7 @@ impl PartialOrd for ThingMeta {
 /// A slice/part of a thing store, for a specific sub-range of thing IDs.
 pub struct ThingStoreSlice {
     base_dir: PathBuf,
+    content_dir: PathBuf,
     meta: HashMap<ThingState, VecDeque<ThingMeta>>,
     pub range_min: ThingId,
     pub range_max: ThingId,
@@ -216,8 +219,11 @@ must be >= range_min ({range_min})"
             ));
         }
 
+        let content_dir = base_dir.join("things");
+        ensure_dir_exists(&content_dir).await?;
         let mut res = Self {
             base_dir,
+            content_dir,
             range_min,
             range_max,
             meta: ThingState::iter()
@@ -225,7 +231,6 @@ must be >= range_min ({range_min})"
                 .collect(),
             last_scrape: earliest(),
         };
-        ensure_dir_exists(&res.content_dir_path()).await?;
         if let Some(last_scrape) = read_last_scrape(last_scrape_file(&res.base_dir, false)).await? {
             res.last_scrape = last_scrape;
         }
@@ -266,7 +271,7 @@ we require no content of the thing, put it was provided",
                     thing_meta.state
                 );
             }
-            self.write_thing_data(thing_meta.id, thing_val);
+            self.write_thing_data(thing_meta.id, thing_val).await?;
         } else if state.has_content() {
             panic!(
                 "Programer Error: With state {:?}, \
@@ -275,13 +280,14 @@ we require the content of the thing, put it was not provided",
             );
         }
 
+        let thing_id = thing_meta.get_id();
+        self.meta.get_mut(&state).unwrap().push_back(thing_meta);
         self.write(state).await?;
         if let Some(next_untried) = self.meta.get(&ThingState::Untried).unwrap().front() {
-            if (next_untried == &thing_meta) {
+            if (next_untried.get_id() == thing_id) {
                 self.meta.get_mut(&ThingState::Untried).unwrap().pop_front();
             }
         }
-        self.meta.get_mut(&state).unwrap().push_back(thing_meta);
         Ok(())
     }
 
@@ -299,12 +305,12 @@ we require the content of the thing, put it was not provided",
         construct_file_path(&self.base_dir, format!("{state}.csv"), temp)
     }
 
-    fn content_dir_path(&self) -> PathBuf {
-        self.base_dir.join("things")
+    fn content_dir_path(&self) -> &Path {
+        self.content_dir.as_path()
     }
 
     fn content_file_path(&self, thing_id: ThingId, temp: bool) -> PathBuf {
-        construct_file_path(&self.base_dir, format!("{thing_id}.json"), temp)
+        construct_file_path(&self.content_dir_path(), format!("{thing_id}.json"), temp)
     }
 
     // fn write_thing_data(&self, data: Thing) -> Result<(), Box<dyn std::error::Error>> {
@@ -312,7 +318,7 @@ we require the content of the thing, put it was not provided",
         &self,
         thing_id: ThingId,
         thing_json: D,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> io::Result<()> {
         let temp_file_path = self.content_file_path(thing_id, true);
         fs::write(&temp_file_path, thing_json.as_ref()).await?;
         std::fs::rename(temp_file_path, self.content_file_path(thing_id, false))?;
@@ -349,20 +355,22 @@ we require the content of the thing, put it was not provided",
     async fn read(&mut self) -> io::Result<()> {
         let mut untried: BTreeSet<ThingId> = (self.range_min..=self.range_max).collect();
         for state in ThingState::iter() {
-            // let mut rdr = csv::Reader::from_path(&self.meta_file_path(false))?;
-            let mut rdr = csv_async::AsyncDeserializer::from_reader(
-                fs::File::open(self.meta_file_path(state, false)).await?,
-            );
-            // for record in rdr.deserialize() {
-            // let thing_meta: ThingMeta = record?;
-            let mut records = rdr.deserialize::<ThingMeta>();
-            while let Some(record) = records.next().await {
-                let thing_meta: ThingMeta = record?;
-                untried.remove(&thing_meta.id);
-                self.meta
-                    .get_mut(&thing_meta.state)
-                    .unwrap()
-                    .push_back(thing_meta);
+            let file_path = self.meta_file_path(state, false);
+            if (file_path.exists().await) {
+                // let mut rdr = csv::Reader::from_path(&self.meta_file_path(false))?;
+                let mut rdr =
+                    csv_async::AsyncDeserializer::from_reader(fs::File::open(&file_path).await?);
+                // for record in rdr.deserialize() {
+                // let thing_meta: ThingMeta = record?;
+                let mut records = rdr.deserialize::<ThingMeta>();
+                while let Some(record) = records.next().await {
+                    let thing_meta: ThingMeta = record?;
+                    untried.remove(&thing_meta.id);
+                    self.meta
+                        .get_mut(&thing_meta.state)
+                        .unwrap()
+                        .push_back(thing_meta);
+                }
             }
         }
         let loaded_thing_meta_count = self
@@ -412,7 +420,7 @@ pub struct ThingStore {
     /// Number of thing IDs covered by one store slice
     slice_size: ThingId,
     /// Store slices currently in memory, indexed by the initial thing ID they cover.
-    slices: HashMap<ThingId, Arc<ThingStoreSlice>>,
+    slices: HashMap<ThingId, Arc<sync::RwLock<ThingStoreSlice>>>,
     /// Time when the last thing was scraped, no matter its state.
     last_scrape: DateTime<Utc>,
 }
@@ -442,16 +450,16 @@ can not be smaller then ({MIN_SLICE_SIZE})"
                 ),
             ));
         }
-        let range = range_max - range_min + 1;
-        if range % slice_size != 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Programer Error: range (range_max - range_min + 1 => \
-{range_max} - {range_min} + 1 = {range}) must be divisible by slice_size ({slice_size})"
-                ),
-            ));
-        }
+        //         let range = range_max - range_min + 1;
+        //         if range % slice_size != 0 {
+        //             return Err(io::Error::new(
+        //                 io::ErrorKind::InvalidData,
+        //                 format!(
+        //                     "Programer Error: range (range_max - range_min + 1 => \
+        // {range_max} - {range_min} + 1 = {range}) must be divisible by slice_size ({slice_size})"
+        //                 ),
+        //             ));
+        //         }
 
         ensure_dir_exists(&root_dir).await?;
         let mut res = Self {
@@ -489,14 +497,16 @@ can not be smaller then ({MIN_SLICE_SIZE})"
     /// This is either the store slice that has the oldest [`Self::last_scrape`] time,
     /// or if not all slices have been scraped yet,
     /// the un-scraped one with the lowest range.
-    pub async fn get_next_slice(&mut self) -> io::Result<Arc<ThingStoreSlice>> {
+    pub async fn get_next_slice(&mut self) -> io::Result<Arc<sync::RwLock<ThingStoreSlice>>> {
         Ok(if (self.slices.len() as ThingId) < self.total_slices() {
             // create and return a new slice
             let range_min = self.slices.len() as ThingId * self.slice_size;
             let range_max = range_min + self.slice_size;
             let base_dir = self.root_dir.join("data").join(range_min.to_string());
             ensure_dir_exists(&base_dir).await?;
-            let slice = Arc::new(ThingStoreSlice::new(base_dir, range_min, range_max).await?);
+            let slice = Arc::new(sync::RwLock::new(
+                ThingStoreSlice::new(base_dir, range_min, range_max).await?,
+            ));
             self.slices.insert(range_min, slice.clone());
             slice
         } else {
