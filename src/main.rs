@@ -89,7 +89,10 @@ async fn main() -> BoxResult<()> {
 
     // pin_mut!(projects); // needed for iteration
     while let Some(project) = projects.next().await {
-        println!("Fetched project:\n{project:#?}");
+        match project {
+            Ok(proj) => println!("Scraped project:\n{proj:#?}"),
+            Err(err) => println!("Scraping error:\n{err:#?}"),
+        }
     }
 
     tracing::trace!("Releasing lock on file '{}' ...", lock_file_path.display());
