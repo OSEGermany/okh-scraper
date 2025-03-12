@@ -17,6 +17,7 @@ use crate::{
 };
 use async_stream::stream;
 use async_trait::async_trait;
+use asyncgit::AsyncGitNotification;
 use asyncgit::{sync::RepoPath, AsyncPull, FetchRequest};
 use crossbeam_channel::unbounded;
 use futures::{stream::BoxStream, stream::StreamExt};
@@ -109,46 +110,73 @@ impl IScraper for Scraper {
             "Fetching manifests containing remote repo '{fetch_url}' to local dir '{}' ...",
             repo_local_dir.display()
         );
-        stream! {
-        let git_get_res = if repo_local_dir.exists() {
+        if repo_local_dir.exists() {
+            tracing::trace!(
+                "Pulling remote repo '{fetch_url}' to local dir '{}' ...",
+                repo_local_dir.display()
+            );
             let repo_path = RepoPath::Path(repo_local_dir.clone());
             let (s1, r) = unbounded();
-            // let s2 = s1.clone();
             let pull = AsyncPull::new(repo_path, &s1);
-            let repo_fetch_res = pull.request(FetchRequest::default());
+            if let Err(err) = pull.request(FetchRequest::default()) {
+                return stream! {
+                    yield Err(err.into());
+                }
+                .boxed();
+            }
 
-            // if let Err(err) = repo_fetch_res {
-            //     yield Err(err.into());
-            // }
-            // r.recv().unwrap();
-            // match r.recv() {
-            //     Ok(_) => {
-            //         repo_fetch_res.map_err(FetchError::from)
-            //     }
-            //     Err(err) => {
-            //         tracing::error!("Error: {:?}", err);
-            //         Err(err.into())
-            //     }
-            // }
-            // Repository::fetch(&repo_local_dir).await?;
-            repo_fetch_res.map_err(Error::from)
+            // For some reason. we get two pull notifications
+            for notification_idx in 0..2 {
+                match r.recv() {
+                    Ok(AsyncGitNotification::Pull) => {
+                        tracing::trace!("Received pull notification {notification_idx}/2.");
+                    }
+                    Ok(notification) => {
+                        tracing::error!(
+                            "Something went wrong while pulling '{fetch_url}': '{notification:#?}'"
+                        );
+                        return stream! {
+                            yield Err(Error::FailedGit(format!("Something went wrong while pulling '{fetch_url}': '{notification:#?}'")));
+                        }.boxed();
+                    }
+                    Err(err) => {
+                        tracing::error!("Error while pulling '{fetch_url}': {err:?}");
+                        return stream! {
+                            yield Err(Error::FailedGit(format!("Error while pulling '{fetch_url}': {err:?}")));
+                        }.boxed();
+                    }
+                }
+            }
         } else {
+            tracing::trace!(
+                "Cloning remote repo '{fetch_url}' to local dir '{}' ...",
+                repo_local_dir.display()
+            );
             let mut fetch_options = FetchOptions::new();
             fetch_options.depth(1);
-            // let fetch_options = FetchOptions {
-            //     depth: 1,
-            //     ..Default::default()
-            // };
-            // Repository::clone(fetch_url, repo_local_dir)?;
             let repo_clone_res = RepoBuilder::new()
                 .fetch_options(fetch_options)
-                .clone(&fetch_url, repo_local_dir.as_ref());
-            repo_clone_res.map_err(Error::from).map(|_| ())
-        };
-        // let repo_local_dir = repo_local_dir.clone();
-            if let Err(err) = git_get_res {
-                yield Err(err);
+                .clone(&fetch_url, repo_local_dir.as_ref())
+                .map_err(Error::from)
+                .map(|_| ());
+
+            if let Err(err) = repo_clone_res {
+                tracing::error!("Error while pulling '{fetch_url}': {err:?}");
+                return stream! {
+                    yield Err(err.into());
+                }
+                .boxed();
             }
+            tracing::trace!(
+                "Cloning remote repo '{fetch_url}' to local dir '{}' - done.",
+                repo_local_dir.display()
+            );
+        };
+        tracing::trace!(
+            "Searching manifests in local dir '{}' ...",
+            repo_local_dir.display()
+        );
+        stream! {
             let (repo, repo_internal_base_path) = HostingUnitIdForge::from_url(&fetch_url)?;
             let local_base_path = repo_local_dir.join(repo_internal_base_path.unwrap_or_default());
             // TODO This (finding files recursively by regex) could be made async too:

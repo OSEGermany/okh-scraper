@@ -186,6 +186,8 @@ pub enum Error {
     IOError(#[from] std::io::Error), // TODO Too low level to be here, and no circumstances info
     #[error("Failed to fetch a git repo (asynchronously): '{0}'")]
     FailedGitFetch(#[from] asyncgit::Error),
+    #[error("Failed to do git operation: '{0}'")]
+    FailedGit(String),
     #[error("Error while searching files in a local directory: '{0}'")]
     FindError(#[from] files_finder::FindError),
     #[error("Network/Internet download failed: '{0}'")]
