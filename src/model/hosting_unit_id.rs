@@ -251,9 +251,9 @@ impl HostingUnitIdForge {
 impl Display for HostingUnitId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            HostingUnitId::Forge(ref id) => f.write_str(&id.to_path_str()),
-            HostingUnitId::WebById(ref id) => f.write_str(&id.to_path_str()),
-            HostingUnitId::ManifestInRepo(ref id) => f.write_str(&id.to_path_str()),
+            Self::Forge(ref id) => f.write_str(&id.to_path_str()),
+            Self::WebById(ref id) => f.write_str(&id.to_path_str()),
+            Self::ManifestInRepo(ref id) => f.write_str(&id.to_path_str()),
         }
     }
 }
@@ -454,7 +454,8 @@ impl HostingUnitIdWebById {
         Ok((hosting_unit_id, path))
     }
 
-    pub fn from_parts(hosting_provider: HostingProviderId, project_id: String) -> Self {
+    #[must_use]
+    pub const fn from_parts(hosting_provider: HostingProviderId, project_id: String) -> Self {
         Self {
             hosting_provider,
             project_id,
@@ -557,7 +558,8 @@ impl IHostingUnitId for HostingUnitIdWebById {
 // }
 
 impl HostingUnitIdManifestInRepo {
-    pub fn new(repo: HostingUnitIdForge, path: PathBuf) -> Self {
+    #[must_use]
+    pub const fn new(repo: HostingUnitIdForge, path: PathBuf) -> Self {
         Self { repo, path }
     }
 }
@@ -580,13 +582,10 @@ impl IHostingUnitId for HostingUnitIdManifestInRepo {
     }
 
     fn create_project_hosting_url(&self) -> Result<Url, SerializeError> {
-        self.repo
-            .create_project_hosting_url()
-            .map(|url| {
-                url.join(&self.path.display().to_string())
-                    .map_err(SerializeError::from)
-            })
-            .map_err(SerializeError::from)?
+        self.repo.create_project_hosting_url().map(|url| {
+            url.join(&self.path.display().to_string())
+                .map_err(SerializeError::from)
+        })?
     }
 
     fn create_download_url(&self, path: &Path) -> Result<Url, SerializeError> {

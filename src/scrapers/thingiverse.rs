@@ -227,15 +227,12 @@ impl IScraper for Scraper {
                     let (state, raw_api_response) = match Self::fetch_thing(client.clone(), thing_id).await {
                     // let (state, raw_api_response) = match Ok::<(String, &str), Error>(("".to_string(), "")) {
                         Err(err) => {
-                            match err {
-                                Error::ProjectDoesNotExist(_) => {
-                                    tracing::info!("Thing {thing_id} does not exist");
-                                    (ThingState::DoesNotExist, None)
-                                },
-                                _ => {
-                                    tracing::error!("Failed to fetch thing-ID {thing_id}: {err}");
-                                    (ThingState::FailedToFetch, None)
-                                }
+                            if let Error::ProjectDoesNotExist(_) = err {
+                                tracing::info!("Thing {thing_id} does not exist");
+                                (ThingState::DoesNotExist, None)
+                            } else {
+                                tracing::error!("Failed to fetch thing-ID {thing_id}: {err}");
+                                (ThingState::FailedToFetch, None)
                             }
                         },
                         Ok((raw_api_response, parsed_as_thing)) => {

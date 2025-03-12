@@ -333,12 +333,12 @@ impl SearchError {
 impl From<SearchError> for Error {
     fn from(other: SearchError) -> Self {
         if let Some(thing_id) = other.get_thing_id_if_not_exists() {
-            Error::ProjectDoesNotExist(HostingUnitId::WebById(HostingUnitIdWebById::from_parts(
+            Self::ProjectDoesNotExist(HostingUnitId::WebById(HostingUnitIdWebById::from_parts(
                 HostingProviderId::ThingiverseCom,
                 thing_id.to_string(),
             )))
         } else {
-            Error::HostingApiMsg(other.error)
+            Self::HostingApiMsg(other.error)
         }
     }
 }
@@ -576,14 +576,13 @@ pub struct Thing {
 //   }
 
 impl Thing {
+    #[must_use]
     pub fn is_open_source(&self) -> bool {
         self.spdx_license().is_some()
     }
 
     pub fn spdx_license(&self) -> Option<String> {
-        if self.license.is_none() {
-            return None;
-        }
+        self.license.as_ref()?;
         let license_raw = self.license.as_ref().unwrap();
 
         if ["None", "Other"].contains(&license_raw.as_str()) {
@@ -592,9 +591,8 @@ impl Thing {
 
         let mapped_license_opt = LICENSE_MAPPING.get(license_raw.as_str());
         mapped_license_opt
-            .map(|(_short_license, spdx_license)| spdx_license.as_deref())
-            .flatten()
-            .map(|str| str.to_owned())
+            .and_then(|(_short_license, spdx_license)| spdx_license.as_deref())
+            .map(std::borrow::ToOwned::to_owned)
     }
 }
 

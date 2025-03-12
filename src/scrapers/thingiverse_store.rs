@@ -49,7 +49,7 @@ pub const LAST_SCRAPE_FILE_NAME: &str = "last_scrape.csv";
 
 pub type ThingId = u32;
 
-fn earliest() -> DateTime<Utc> {
+const fn earliest() -> DateTime<Utc> {
     // TODO Maybe this would be more performant if wed make a Lazy constant and cloned it.
     DateTime::from_timestamp_nanos(0)
 }
@@ -122,14 +122,16 @@ pub enum ThingState {
 }
 
 impl ThingState {
-    pub fn has_content(self) -> bool {
+    #[must_use]
+    pub const fn has_content(self) -> bool {
         match self {
             Self::FailedToFetch | Self::DoesNotExist | Self::Proprietary | Self::Untried => false,
             Self::OpenSource => true,
         }
     }
 
-    pub fn to_str(self) -> &'static str {
+    #[must_use]
+    pub const fn to_str(self) -> &'static str {
         match self {
             Self::FailedToFetch => "failed_to_fetch",
             Self::DoesNotExist => "does_not_exist",
@@ -203,7 +205,8 @@ pub struct ThingMeta {
 }
 
 impl ThingMeta {
-    pub fn new(id: ThingId, state: ThingState, first_scrape: DateTime<Utc>) -> Self {
+    #[must_use]
+    pub const fn new(id: ThingId, state: ThingState, first_scrape: DateTime<Utc>) -> Self {
         Self {
             id,
             state,
@@ -239,11 +242,12 @@ impl ThingMeta {
         }
     }
 
-    fn new_untried(id: ThingId) -> Self {
+    const fn new_untried(id: ThingId) -> Self {
         Self::new(id, ThingState::Untried, earliest())
     }
 
-    pub fn get_id(&self) -> ThingId {
+    #[must_use]
+    pub const fn get_id(&self) -> ThingId {
         self.id
     }
 }
@@ -309,16 +313,19 @@ must be >= range_min ({range_min})"
     }
 
     /// Returns the number of things within this slice with the given state.
+    #[must_use]
     pub fn num(&self, state: ThingState) -> ThingId {
         self.meta.get(&state).unwrap().len() as ThingId
     }
 
+    #[must_use]
     pub fn next(&self, state: ThingState) -> Option<&ThingMeta> {
         self.meta.get(&state).unwrap().front()
     }
 
     /// Returns the number of thing IDs covered by this slices.
-    pub fn size(&self) -> ThingId {
+    #[must_use]
+    pub const fn size(&self) -> ThingId {
         self.range_max - self.range_min + 1
     }
 
@@ -333,13 +340,12 @@ must be >= range_min ({range_min})"
             panic!("Programer Error: State {state} should never be inserted into the store");
         }
         if let Some(thing_val) = thing {
-            if !state.has_content() {
-                panic!(
-                    "Programer Error: With state {:?}, \
+            assert!(
+                state.has_content(),
+                "Programer Error: With state {:?}, \
 we require no content of the thing, put it was provided",
-                    thing_meta.state
-                );
-            }
+                thing_meta.state
+            );
             self.write_thing_data(thing_meta.id, thing_val).await?;
         } else if state.has_content() {
             panic!(
@@ -361,6 +367,7 @@ we require the content of the thing, put it was not provided",
     }
 
     /// Returned a cloned list of the [`ThingState::OpenSource`]` [`ThingMeta`]s.
+    #[must_use]
     pub fn cloned_os(&self) -> VecDeque<ThingId> {
         self.meta
             .get(&ThingState::OpenSource)
@@ -379,7 +386,7 @@ we require the content of the thing, put it was not provided",
     }
 
     fn content_file_path(&self, thing_id: ThingId, temp: bool) -> PathBuf {
-        construct_file_path(&self.content_dir_path(), format!("{thing_id}.json"), temp)
+        construct_file_path(self.content_dir_path(), format!("{thing_id}.json"), temp)
     }
 
     // fn write_thing_data(&self, data: Thing) -> Result<(), Box<dyn std::error::Error>> {
@@ -442,8 +449,8 @@ we require the content of the thing, put it was not provided",
         }
         let loaded_thing_meta_count = self
             .meta
-            .iter()
-            .map(|(_, v)| v.len() as ThingId)
+            .values()
+            .map(|v| v.len() as ThingId)
             .sum::<ThingId>();
         if loaded_thing_meta_count + untried.len() as ThingId != self.size() {
             let msg = format!(
@@ -553,7 +560,7 @@ can not be smaller then ({MIN_SLICE_SIZE})"
 
     /// Returns the number of total/maximum slices in the stores range.
     #[must_use]
-    pub fn total_slices(&self) -> ThingId {
+    pub const fn total_slices(&self) -> ThingId {
         self.range() / self.slice_size
     }
 
@@ -584,7 +591,7 @@ can not be smaller then ({MIN_SLICE_SIZE})"
         })
     }
 
-    pub fn set_last_scrape(&mut self, time: DateTime<Utc>) {
+    pub const fn set_last_scrape(&mut self, time: DateTime<Utc>) {
         self.last_scrape = time;
     }
 }
