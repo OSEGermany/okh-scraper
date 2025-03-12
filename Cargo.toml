@@ -43,6 +43,7 @@ print_stderr = "warn"
 # missing_errors_doc = "allow"
 # missing_panics_doc = "allow"
 # indexing_slicing = "allow"
+result_large_err = "allow"
 
 [dependencies]
 async-std = "1.13"
