@@ -1,0 +1,231 @@
+# SPDX-FileCopyrightText: 2021 - 2024 Robin Vobruba <hoijui.quaero@gmail.com>
+#
+# SPDX-License-Identifier: Unlicense
+
+# The create-release job runs purely to initialize the GitHub release itself
+# and to output upload_url for the following job.
+#
+# The build-release job runs only once create-release is finished. It gets the
+# release upload URL from create-release job outputs, then builds the release
+# executables for each supported platform and attaches them as release assets
+# to the previously created release.
+#
+# The key here is that we create the release only once.
+#
+# Reference:
+# https://eugene-babichenko.github.io/blog/2020/05/09/github-actions-cross-platform-auto-releases/
+
+# This file was copied from the ripgrep project, and then adjusted
+
+name: release
+
+permissions:
+  # This is required by softprops/action-gh-release to create a release,
+  # see: <https://github.com/softprops/action-gh-release/issues/236#issuecomment-1150530128>
+  contents: write
+
+on:
+  push:
+    tags:
+    - "[0-9]+.[0-9]+.[0-9]+"
+
+env:
+  RUST_BACKTRACE: 1
+
+jobs:
+  create-release:
+    name: create-release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.release.outputs.upload_url }}
+      our_version: ${{ env.OUR_VERSION }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        if: env.OUR_VERSION == ''
+        with:
+          # This makes sure we also get tags,
+          # so we get the correct version; see bug:
+          # https://github.com/actions/checkout/issues/701
+          fetch-depth: 0
+          submodules: true
+
+      - name: "Check out the build scripts"
+        uses: actions/checkout@v4
+        with:
+          repository: 'hoijui/rust-project-scripts'
+          path: 'run/rp'
+          submodules: true
+
+      - name: "Mark the build scripts as Git-ignored, locally"
+        run: if ! grep -q -r "^/run/rp/\$" .git/info/exclude; then echo '/run/rp/' >> .git/info/exclude; fi
+
+      - name: "Install STOML (BASH TOML parser)"
+        run: run/rp/install_stoml
+
+      - name: Set the environment variables (including OUR_VERSION)
+        shell: bash
+        if: env.OUR_VERSION == ''
+        run: run/rp/env
+
+      - name: Create GitHub release
+        id: release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ env.OUR_VERSION }}
+
+  build-release:
+    name: build-release
+    needs: ['create-release']
+    runs-on: ${{ matrix.os }}
+    env:
+      TARGET: ${{ matrix.target }}
+      OS: ${{ matrix.os }}
+      # For some builds, we use cross to test on 32-bit and big-endian
+      # systems.
+      CARGO: cargo
+      # When CARGO is set to CROSS, this is set to `--target matrix.target`.
+    strategy:
+      matrix:
+        # build: [linux, linux-arm, macos, win-msvc, win-gnu, win32-msvc]
+        build: [linux]
+        include:
+        - build: linux
+          os: ubuntu-latest
+          rust: nightly
+          target: x86_64-unknown-linux-musl
+        # - build: linux-arm
+        #   os: ubuntu-18.04
+        #   rust: nightly
+        #   target: arm-unknown-linux-gnueabihf
+        # - build: macos
+        #   os: macos-latest
+        #   rust: nightly
+        #   target: x86_64-apple-darwin
+        # - build: win-msvc
+        #   os: windows-2019
+        #   rust: nightly
+        #   target: x86_64-pc-windows-msvc
+        # - build: win-gnu
+        #   os: windows-2019
+        #   rust: nightly-x86_64-gnu
+        #   target: x86_64-pc-windows-gnu
+        # - build: win32-msvc
+        #   os: windows-2019
+        #   rust: nightly
+        #   target: i686-pc-windows-msvc
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: true
+
+    - name: "Check out the build scripts"
+      uses: actions/checkout@v4
+      with:
+        repository: 'hoijui/rust-project-scripts'
+        path: 'run/rp'
+        submodules: true
+
+    - name: "Mark the build scripts as Git-ignored, locally"
+      run: if ! grep -q -r "^/run/rp/\$" .git/info/exclude; then echo '/run/rp/' >> .git/info/exclude; fi
+
+    - name: "Install STOML (BASH TOML parser)"
+      run: |
+        run/rp/install_stoml
+
+    - name: Set the environment variables (including OUR_VERSION)
+      shell: bash
+      if: env.OUR_VERSION == ''
+      run: run/rp/env
+
+    - name: Install packages (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        run/rp/install_deps_ubuntu
+
+    # - name: Install packages (macOS)
+    #   if: matrix.os == 'macos-latest'
+    #   run: |
+    #     ci/macos-install-packages
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.rust }}
+        target: ${{ matrix.target }}
+
+    # - name: Use Cross
+    #   shell: bash
+    #   run: |
+    #     cargo install cross
+    #     echo "CARGO=cross" >> $GITHUB_ENV
+    #     echo "TARGET_FLAG=--target ${{ matrix.target }}" >> $GITHUB_ENV
+    #     echo "TARGET_DIR=./target/${{ matrix.target }}" >> $GITHUB_ENV
+
+    - name: Show command used for Cargo
+      run: |
+        echo "cargo command is: ${{ env.CARGO }}"
+        echo "target flag is: ${{ matrix.target }}"
+        echo "target dir is: ${{ env.TARGET_DIR }}"
+
+    - name: Build and strip release binary
+      run: run/rp/build --skip-strip
+
+    # - name: Strip release binary (linux and macos)
+    #   if: matrix.build == 'linux' || matrix.build == 'macos'
+    #   run: strip "${{ env.BINARY_PATH }}"
+
+    # - name: Strip release binary (arm)
+    #   if: matrix.build == 'linux-arm'
+    #   run: |
+    #     docker run --rm -v \
+    #       "$PWD/target:/target:Z" \
+    #       rustembedded/cross:arm-unknown-linux-gnueabihf \
+    #       arm-linux-gnueabihf-strip \
+    #       /target/arm-unknown-linux-gnueabihf/release/${{ env.BINARY }}
+
+    - name: Test Release Version (if binary)
+      shell: bash
+      run: |
+        export ENV_FILE="proj_build_envs.txt"
+        # This writes "BINARY=bla" to ENV_FILE
+        run/rp/env
+        source "$ENV_FILE"
+        BIN="target/release/$BINARY"
+        if [ -f "$BIN" ]
+        then
+          VER_TOOL="$("$BIN" --version --quiet)"
+          VER_TAG="${GITHUB_REF#refs/*/}"
+          (
+            echo "VER_TOOL: $VER_TOOL"
+            echo "VER_TAG: $VER_TAG"
+          ) | tee /dev/stderr
+          if ! [ "$VER_TOOL" == "$VER_TAG" ]
+          then
+            >&2 echo "ERROR: Version reported by tool ('$VER_TOOL') should equal the release tag ('$VER_TAG')!"
+            exit 1
+          fi
+          if ! [[ $VER_TOOL =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          then
+            >&2 echo "ERROR: Version reported by tool ('$VER_TOOL') should be a semver compatible string, i.e. of the form: "'^[0-9]+\.[0-9]+\.[0-9]+$'
+            exit 2
+          fi
+        fi
+
+    - name: Build archive
+      shell: bash
+      run: |
+        run/rp/package
+
+    - name: Upload release archive
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ${{ env.TARGET_DIR }}/${{ env.PACKAGE_ARCHIVE }}
+        asset_name: ${{ env.PACKAGE_ARCHIVE }}
+        asset_content_type: application/octet-stream

@@ -1,0 +1,85 @@
+# SPDX-FileCopyrightText: 2021 - 2024 Robin Vobruba <hoijui.quaero@gmail.com>
+#
+# SPDX-License-Identifier: Unlicense
+
+name: build
+
+on:
+  push:
+    branches: [ master, develop ]
+    paths:
+      - 'src/**'
+      - '**/src/**'
+      - 'tests/**'
+      - '**/tests/**'
+      - 'Cargo.toml'
+      - '**/Cargo.toml'
+      - 'Cargo.lock'
+      - '**/Cargo.lock'
+      - '.github/workflows/build.yml'
+  release:
+    types: [ published ]
+
+env:
+  RUST_BACKTRACE: 1
+
+jobs:
+  push_to_registry:
+    name: Compile
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Check out the repo"
+        uses: actions/checkout@v4
+        with:
+          # This makes sure we also get tags,
+          # so we get the correct version; see bug:
+          # https://github.com/actions/checkout/issues/701
+          fetch-depth: 0
+          submodules: true
+
+      - name: "Check out the build scripts"
+        uses: actions/checkout@v4
+        with:
+          repository: 'hoijui/rust-project-scripts'
+          path: 'run/rp'
+          submodules: true
+
+      - name: "Mark the build scripts as Git-ignored, locally"
+        run: if ! grep -q -r "^/run/rp/\$" .git/info/exclude; then echo '/run/rp/' >> .git/info/exclude; fi
+
+      - name: "Install STOML (BASH TOML parser)"
+        run: run/rp/install_stoml
+
+      - name: "Setup Python 3"
+        uses: actions/setup-python@v4
+        with:
+            python-version: '3.x'
+            cache: 'pip' # caching pip dependencies
+            cache-dependency-path: '.github/requirements-ci.txt'
+
+      - name: "Install the REUSE tool"
+        run: pip install reuse
+
+      - name: "Install musl-gcc"
+        # This is required, because we depend on system libraries
+        # like libz, which need to be compiled for MUSL with musl-gcc,
+        # which is part of musl-tools.
+        run: sudo apt install -y musl-tools
+
+      - name: "Get the Rust toolchain"
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+          components: rustfmt, clippy
+
+      - name: "Smart caching for rust/cargo"
+        uses: Swatinem/rust-cache@v2
+
+      - name: "Install STOML (BASH TOML parser) *again*, because the cache recreation above might have removed it"
+        run: run/rp/install_stoml
+
+      - name: "Build"
+        run: run/rp/build
+
+      - name: "Test & Check"
+        run: run/rp/test
