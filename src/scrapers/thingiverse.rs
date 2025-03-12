@@ -213,8 +213,6 @@ impl IScraper for Scraper {
 
         tracing::info!("Fetching {} - total ...", self.info().name);
         stream! {
-            yield Err(io::Error::new(io::ErrorKind::InvalidData,
-                format!("tst")).into());
             loop {
                 let mut store_slice = store.get_next_slice().await?;
                 let mut store_slice = store_slice.write().await;
