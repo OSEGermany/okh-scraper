@@ -202,8 +202,12 @@ pub enum Error {
     OshwaApiError(#[from] oshwa::ApiError), // TODO Really, we should not have such scraper-specific errors here
     #[error("Hosting technology (e.g. platform) API returned error: {0}")]
     HostingApiMsg(String),
+    #[error("Project that was tired to scrape is not publicly visible, either on purpose by the authors, or because it is flagged as violating some rules.")]
+    ProjectNotPublic,
+    #[error("Project that was tired to scrape does not exist")]
+    ProjectDoesNotExist,
     #[error("Project that was tired to scrape does not exist: {0}")]
-    ProjectDoesNotExist(HostingUnitId),
+    ProjectDoesNotExistId(HostingUnitId),
     #[error("Failed to parse a hosting URL to a hosting-unit-id: {0}")]
     HostingUnitIdParseError(#[from] hosting_unit_id::ParseError),
     #[error("Failed pull git repo (asynchronously): {0}")]

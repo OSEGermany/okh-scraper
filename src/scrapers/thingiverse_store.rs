@@ -113,6 +113,10 @@ pub enum ThingState {
     /// The thing once existed, but is now deleted,
     /// or directly never existed on Thingiverse.
     DoesNotExist,
+    /// The thing is "under moderation", meaning most likely,
+    /// that some lawyer of a big company threatened to take legal actions,
+    /// if the thing remains online.
+    Banned,
     /// The thing exists, but has a proprietary license.
     Proprietary,
     /// The thing exists, and has an Open Source license.
@@ -125,7 +129,11 @@ impl ThingState {
     #[must_use]
     pub const fn has_content(self) -> bool {
         match self {
-            Self::FailedToFetch | Self::DoesNotExist | Self::Proprietary | Self::Untried => false,
+            Self::FailedToFetch
+            | Self::DoesNotExist
+            | Self::Banned
+            | Self::Proprietary
+            | Self::Untried => false,
             Self::OpenSource => true,
         }
     }
@@ -135,6 +143,7 @@ impl ThingState {
         match self {
             Self::FailedToFetch => "failed_to_fetch",
             Self::DoesNotExist => "does_not_exist",
+            Self::Banned => "banned",
             Self::Proprietary => "proprietary",
             Self::OpenSource => "open_source",
             Self::Untried => "untried",
@@ -143,7 +152,7 @@ impl ThingState {
 
     const fn is_successful_fetch(self) -> bool {
         match self {
-            Self::FailedToFetch | Self::DoesNotExist | Self::Untried => false,
+            Self::FailedToFetch | Self::DoesNotExist | Self::Banned | Self::Untried => false,
             Self::Proprietary | Self::OpenSource => true,
         }
     }

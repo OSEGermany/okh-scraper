@@ -218,9 +218,12 @@ impl IScraper for Scraper {
                     let (state, raw_api_response) = match Self::fetch_thing(client.clone(), thing_id).await {
                     // let (state, raw_api_response) = match Ok::<(String, &str), Error>(("".to_string(), "")) {
                         Err(err) => {
-                            if let Error::ProjectDoesNotExist(_) = err {
+                            if let Error::ProjectDoesNotExist | Error::ProjectDoesNotExistId(_) = err {
                                 tracing::info!("Thing {thing_id} does not exist");
                                 (ThingState::DoesNotExist, None)
+                            } else if let Error::ProjectNotPublic = err {
+                                tracing::info!("Thing {thing_id} is \"under moderation\" -> most likely flagged as copyright infringing");
+                                (ThingState::Banned, None)
                             } else {
                                 tracing::error!("Failed to fetch thing-ID {thing_id}: {err}");
                                 (ThingState::FailedToFetch, None)

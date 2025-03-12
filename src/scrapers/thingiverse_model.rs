@@ -330,6 +330,14 @@ impl SearchError {
         // self.error.starts_with("Thing ") && self.error.ends_with(" does not exist")
     }
 
+    pub fn is_thing_has_not_been_published(&self) -> bool {
+        self.error == "Thing has not been published"
+    }
+
+    pub fn is_thing_is_under_moderation(&self) -> bool {
+        self.error == "Thing is under moderation"
+    }
+
     pub fn get_thing_id_if_not_exists(&self) -> Option<ThingId> {
         RE_ERR_MSG_DOES_NOT_EXIST
             .captures(&self.error)
@@ -342,8 +350,12 @@ impl SearchError {
 
 impl From<SearchError> for Error {
     fn from(other: SearchError) -> Self {
-        if let Some(thing_id) = other.get_thing_id_if_not_exists() {
-            Self::ProjectDoesNotExist(HostingUnitId::WebById(HostingUnitIdWebById::from_parts(
+        if other.is_thing_has_not_been_published() {
+            Self::ProjectDoesNotExist
+        } else if other.is_thing_is_under_moderation() {
+            Self::ProjectNotPublic
+        } else if let Some(thing_id) = other.get_thing_id_if_not_exists() {
+            Self::ProjectDoesNotExistId(HostingUnitId::WebById(HostingUnitIdWebById::from_parts(
                 HostingProviderId::ThingiverseCom,
                 thing_id.to_string(),
             )))
