@@ -105,24 +105,24 @@ impl IScraper for Scraper {
                 let client = Arc::<_>::clone(&self.downloader);
 
                 stream! {
-                        for batch_index in 0..batches {
-                            let rate_limiter = Arc::<_>::clone(&RATE_LIMITER);
-                                tracing::info!(
-                                    "Fetching {self_name} - batch {batch_index}/{batches} ..."
-                                );
-                                rate_limiter.until_ready().await;
-                                let offset = batch_index * batch_size;
-                                let batch_res = Self::fetch_projects_batch(Arc::<_>::clone(&client), &access_token, batch_size, offset).await;
-                                match batch_res {
-                                    Err(err) => yield Err(err),
-                                    Ok(projects) => {
-                                        for raw_proj in projects.items {
-                                            yield Ok(Project::new(HostingUnitId::from((HOSTING_PROVIDER_ID, raw_proj.oshwa_uid))));
-                                        }
-                                    },
+                    for batch_index in 0..batches {
+                        let rate_limiter = Arc::<_>::clone(&RATE_LIMITER);
+                        tracing::info!(
+                            "Fetching {self_name} - batch {batch_index}/{batches} ..."
+                        );
+                        rate_limiter.until_ready().await;
+                        let offset = batch_index * batch_size;
+                        let batch_res = Self::fetch_projects_batch(Arc::<_>::clone(&client), &access_token, batch_size, offset).await;
+                        match batch_res {
+                            Err(err) => yield Err(err),
+                            Ok(projects) => {
+                                for raw_proj in projects.items {
+                                    yield Ok(Project::new(HostingUnitId::from((HOSTING_PROVIDER_ID, raw_proj.oshwa_uid))));
                                 }
+                            },
                         }
-                    }.boxed()
+                    }
+                }.boxed()
             }
         }
     }
