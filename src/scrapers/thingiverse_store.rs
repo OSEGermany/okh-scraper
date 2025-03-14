@@ -610,7 +610,7 @@ can not be smaller then ({MIN_SLICE_SIZE})"
         })
     }
 
-    pub const fn set_last_scrape(&mut self, time: DateTime<Utc>) {
+    pub fn set_last_scrape(&mut self, time: DateTime<Utc>) {
         self.last_scrape = time;
     }
 }

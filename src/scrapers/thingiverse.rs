@@ -382,7 +382,9 @@ both as the expected type and as an error response:\n{serde_err}\n{err_err}"
         Self::parse_api_response::<SearchSuccess>(&res_raw_text).map(
             |parsed_response|
                 parsed_response.map(|success|
-                    success.hits.first().expect("No hits returned when fetching latest thing from thingiverse.com - this should never happen").id).into_result()).flatten()
+                    success.hits.first().expect(
+                        "No hits returned when fetching latest thing from thingiverse.com - this should never happen"
+                    ).id))?.into_result()
     }
 
     // #[instrument]
