@@ -12,7 +12,7 @@ use crate::{
         hosting_unit_id::HostingUnitId, project::Project,
     },
     settings::PartialSettings,
-    tools::{SpdxLicenseExpression, LICENSE_UNKNOWN, USER_AGENT_VALUE},
+    tools::{SpdxLicenseExpression, LICENSE_UNKNOWN},
 };
 use async_std::{
     fs::{self, File},
@@ -26,10 +26,6 @@ use chrono::{DateTime, Utc};
 use core::slice;
 use futures::{stream::BoxStream, stream::StreamExt};
 use governor::{Quota, RateLimiter};
-use reqwest::{
-    header::{HeaderMap, AUTHORIZATION, USER_AGENT},
-    Client,
-};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::LazyLock;

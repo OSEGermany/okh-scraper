@@ -13,13 +13,12 @@ use crate::{
         hosting_unit_id::HostingUnitId, project::Project,
     },
     settings::PartialSettings,
-    tools::{SpdxLicenseExpression, LICENSE_UNKNOWN, USER_AGENT_VALUE},
+    tools::{SpdxLicenseExpression, LICENSE_UNKNOWN},
 };
 use async_stream::stream;
 use async_trait::async_trait;
 use futures::{stream::BoxStream, stream::StreamExt};
 use governor::{Quota, RateLimiter};
-use reqwest::header::{HeaderMap, AUTHORIZATION, USER_AGENT};
 use reqwest_middleware::ClientWithMiddleware;
 use serde::Deserialize;
 use serde_json::Value;
@@ -345,15 +344,8 @@ impl Scraper {
         offset: usize,
     ) -> Result<Projects, Error> {
         let params = [("limit", batch_size), ("offset", offset)];
-        let mut headers = HeaderMap::new();
-        headers.insert(USER_AGENT, USER_AGENT_VALUE.clone());
-        headers.insert(
-            AUTHORIZATION,
-            format!("Bearer {access_token}").parse().unwrap(),
-        );
         let res_projects_raw_json = client
             .get("https://certificationapi.oshwa.org/api/projects")
-            .headers(headers)
             .query(&params)
             .send()
             .await?

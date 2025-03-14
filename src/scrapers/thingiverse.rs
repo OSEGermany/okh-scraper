@@ -22,7 +22,7 @@ use crate::{
     },
     settings::PartialSettings,
     structured_content::{Chunk, RawContent, SerializationFormat},
-    tools::{SpdxLicenseExpression, LICENSE_UNKNOWN, USER_AGENT_VALUE},
+    tools::{SpdxLicenseExpression, LICENSE_UNKNOWN},
 };
 use async_std::{fs::File, io};
 use async_stream::stream;
@@ -31,7 +31,7 @@ use chrono::{DateTime, Utc};
 use fs4::async_std::AsyncFileExt;
 use futures::{stream::BoxStream, stream::StreamExt};
 use governor::{Quota, RateLimiter};
-use reqwest::header::{HeaderMap, AUTHORIZATION, USER_AGENT};
+use reqwest::header::HeaderMap;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

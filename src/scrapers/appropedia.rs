@@ -19,7 +19,7 @@ use crate::{
 use async_stream::stream;
 use async_trait::async_trait;
 use futures::{stream::BoxStream, stream::StreamExt};
-use reqwest::header::{HeaderMap, ACCEPT, USER_AGENT};
+use reqwest::header::{HeaderMap, ACCEPT};
 use reqwest_middleware::ClientWithMiddleware;
 use serde::Deserialize;
 use serde_json::Value;
@@ -112,12 +112,6 @@ impl Scraper {
         ];
         let mut headers = HeaderMap::new();
         headers.insert(ACCEPT, "application/json".parse().unwrap());
-        headers.insert(
-            USER_AGENT,
-            "okh-scraper github.com/iop-alliance/OpenKnowHow"
-                .parse()
-                .unwrap(),
-        );
         let res = client
             .get("https://www.appropedia.org/w/api.php")
             .headers(headers)

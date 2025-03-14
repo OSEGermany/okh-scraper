@@ -14,17 +14,13 @@ use crate::{
         project::Project,
     },
     settings::PartialSettings,
-    tools::{SpdxLicenseExpression, LICENSE_UNKNOWN, USER_AGENT_VALUE},
+    tools::{SpdxLicenseExpression, LICENSE_UNKNOWN},
 };
 use async_stream::stream;
 use async_trait::async_trait;
 use futures::{stream::BoxStream, stream::StreamExt};
 use governor::{Quota, RateLimiter};
 use regex::Regex;
-use reqwest::{
-    header::{HeaderMap, AUTHORIZATION, USER_AGENT},
-    Client,
-};
 use serde::Deserialize;
 use serde_json::Value;
 use std::sync::LazyLock;
