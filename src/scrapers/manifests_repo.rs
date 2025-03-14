@@ -77,9 +77,9 @@ impl IScraperFactory for ScraperFactory {
     fn create(
         &self,
         config_all: Arc<PartialSettings>,
-        config_fetcher: Value,
+        config_scraper: Value,
     ) -> Result<Box<dyn IScraper>, CreationError> {
-        let config: Config = serde_json::from_value(config_fetcher).unwrap();
+        let config: Config = serde_json::from_value(config_scraper).unwrap();
         let downloader = create_downloader_retry(&config);
         Ok(Box::new(Scraper {
             config_all,
@@ -103,7 +103,7 @@ impl IScraper for Scraper {
     }
 
     // #[instrument]
-    async fn fetch_all(&self) -> BoxStream<'static, Result<Project, Error>> {
+    async fn scrape(&self) -> BoxStream<'static, Result<Project, Error>> {
         let fetch_url = self.config.repo_fetch_url.clone();
         let repo_local_dir = self.generate_repo_local_dir(&fetch_url);
         tracing::info!(

@@ -240,7 +240,7 @@ pub trait Factory {
     fn create(
         &self,
         config_all: Arc<PartialSettings>,
-        config_fetcher: Value,
+        config_scraper: Value,
     ) -> Result<Box<dyn Scraper>, CreationError>;
 }
 
@@ -251,7 +251,10 @@ pub trait Scraper {
     /// Info about this type of scraper.
     fn info(&self) -> &'static TypeInfo;
 
-    async fn fetch_all(&self) -> BoxStream<'static, Result<Project, Error>>;
+    /// Potentially infinite scraping of projects.
+    ///
+    /// It may fail and return on grave errors.
+    async fn scrape(&self) -> BoxStream<'static, Result<Project, Error>>;
 }
 
 impl std::fmt::Display for dyn Scraper {

@@ -79,7 +79,7 @@ async fn main() -> BoxResult<()> {
     tracing::info!("Setting up fetchers ...");
     for (fetcher_id, fetcher) in run_settings.fetchers {
         tracing::info!("- Setting up fetcher {fetcher_id} ...");
-        fetch_streams.push(fetcher.fetch_all().await);
+        fetch_streams.push(fetcher.scrape().await);
     }
 
     // stream_test::test().await;

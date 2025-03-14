@@ -50,9 +50,9 @@ impl IScraperFactory for ScraperFactory {
     fn create(
         &self,
         config_all: Arc<PartialSettings>,
-        config_fetcher: Value,
+        config_scraper: Value,
     ) -> Result<Box<dyn IScraper>, CreationError> {
-        let config: Config = serde_json::from_value(config_fetcher).unwrap();
+        let config: Config = serde_json::from_value(config_scraper).unwrap();
         let downloader = create_downloader_retry(&config);
         Ok(Box::new(Scraper {
             config_all,
@@ -74,7 +74,7 @@ impl super::Scraper for Scraper {
         &SCRAPER_TYPE
     }
 
-    async fn fetch_all(&self) -> BoxStream<'static, Result<Project, Error>> {
+    async fn scrape(&self) -> BoxStream<'static, Result<Project, Error>> {
         let client = Arc::<_>::clone(&self.downloader);
         match self.fetch_project_names(Arc::<_>::clone(&client)).await {
             Ok(project_names) => stream! {
