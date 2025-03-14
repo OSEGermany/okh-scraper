@@ -30,6 +30,28 @@ fn print_version_and_exit(quiet: bool) {
     std::process::exit(0);
 }
 
+macro_rules! lock_file {
+    ($path_var:ident, $file_var:ident) => {
+        if !$path_var.exists().await {
+            fs::File::create(&$path_var).await?;
+        }
+        tracing::debug!("Preparing to lock file '{}' ...", $path_var.display());
+        let $file_var = fs::File::open(&$path_var).await?;
+        if !$file_var.try_lock_exclusive()? {
+            return Err(format!("Failed to lock file '{}'", $path_var.display()).into());
+        }
+        tracing::debug!("Obtained lock on file '{}'.", $path_var.display());
+    };
+}
+
+macro_rules! unlock_file {
+    ($path_var:ident, $file_var:ident) => {
+        tracing::trace!("Releasing lock on file '{}' ...", $path_var.display());
+        $file_var.unlock()?;
+        tracing::info!("Released lock on file '{}'.", $path_var.display());
+    };
+}
+
 #[tokio::main]
 #[instrument]
 async fn main() -> BoxResult<()> {
@@ -57,23 +79,34 @@ async fn main() -> BoxResult<()> {
     let src = args.get_one::<String>(cli::A_L_INPUT).cloned();
     let dst = args.get_one::<String>(cli::A_L_OUTPUT).cloned();
 
-    // TODO choose a good file name (e.g. /tmp/okh-scraper_thingiverse.lock)
-    let lock_file_path = path::PathBuf::from("/tmp/okh-scraper.lock");
-    if !lock_file_path.exists().await {
-        fs::File::create(&lock_file_path).await?;
-    }
-
-    tracing::debug!("Preparing to lock file '{}' ...", lock_file_path.display());
-    // let lock_file = fs::OpenOptions::new()
-    //     .create(true)
-    //     .open(&lock_file_path).await?;
-    let lock_file = fs::File::open(&lock_file_path).await?;
-    if !lock_file.try_lock_exclusive()? {
-        return Err(format!("Failed to lock file '{}'", lock_file_path.display()).into());
-    }
-    tracing::debug!("Obtained lock on file '{}'.", lock_file_path.display());
+    // With this we try to enforce
+    // that at most one scraper instance is running at a time,
+    // on this system.
+    let system_lock_file_path = path::PathBuf::from("/tmp/okh-scraper.lock");
+    lock_file!(system_lock_file_path, system_lock_file);
 
     let run_settings = settings::load()?;
+
+    // With this we try to enforce
+    // that at most one scraper instance is running at a time,
+    // that uses this workdir.
+    //
+    // We need both these lock files,
+    // because otherwise one might run the scraper once (or more times) in a container,
+    // and at the same time on the host machine, using the same workdir,
+    // which would mess up the storage completely.
+    //
+    // If we had only this one nad not the former,
+    // One might run the scraper multiple times on the same machine,
+    // using different workdirs,
+    // which would under-cut the API requests per minute quotas.
+    //
+    // NOTE This way, one could still run one scraper in a container
+    //      and one on the host, using different workdirs.
+    //      -> Don't do that!
+    let workdir_lock_file_path = path::PathBuf::from(run_settings.database.path).join("okh-scraper-workdir.lock");
+    lock_file!(workdir_lock_file_path, workdir_lock_file);
+
     let mut fetch_streams = Vec::new();
     // TODO Parallelize this loop
     tracing::info!("Setting up fetchers ...");
@@ -95,9 +128,8 @@ async fn main() -> BoxResult<()> {
         }
     }
 
-    tracing::trace!("Releasing lock on file '{}' ...", lock_file_path.display());
-    lock_file.unlock()?;
-    tracing::info!("Released lock on file '{}'.", lock_file_path.display());
+    unlock_file!(system_lock_file_path, system_lock_file);
+    unlock_file!(workdir_lock_file_path, workdir_lock_file);
 
     // fetchers::appropedia::fetch_all().await?;
     // fetchers::oshwa::fetch_all().await?;
