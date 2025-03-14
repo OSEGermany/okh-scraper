@@ -90,7 +90,7 @@ async fn main() -> BoxResult<()> {
     // pin_mut!(projects); // needed for iteration
     while let Some(project) = projects.next().await {
         match project {
-            Ok(proj) => println!("Scraped project:\n{proj:#?}"),
+            Ok(proj) => println!("Scraped project: {}", proj.id),
             Err(err) => println!("Scraping error:\n{err:#?}"),
         }
     }
