@@ -38,7 +38,7 @@ and then scans it for manifest files.",
 });
 
 pub static RE_MANIFEST_FILE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\.(toml|ya?ml|json)$").unwrap());
+    LazyLock::new(|| Regex::new(r"(?i).*okh.*\.(toml|ya?ml|json)$").unwrap());
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
