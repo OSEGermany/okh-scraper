@@ -4,6 +4,7 @@
 
 // #![feature(specialization)]
 // #![feature(min_specialization)]
+#![feature(result_flattening)]
 
 pub mod files_finder;
 pub mod model;

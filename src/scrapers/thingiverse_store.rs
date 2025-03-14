@@ -110,6 +110,8 @@ async fn read_last_scrape<P: AsRef<Path>>(file: P) -> io::Result<Option<DateTime
 pub enum ThingState {
     /// There was some kind of error when trying to fetch the thing.
     FailedToFetch,
+    /// We failed to parse the fetched thing.
+    FailedToParse,
     /// The thing once existed, but is now deleted,
     /// or directly never existed on Thingiverse.
     DoesNotExist,
@@ -134,7 +136,7 @@ impl ThingState {
             | Self::Banned
             | Self::Proprietary
             | Self::Untried => false,
-            Self::OpenSource => true,
+            Self::FailedToParse | Self::OpenSource => true,
         }
     }
 
@@ -142,6 +144,7 @@ impl ThingState {
     pub const fn to_str(self) -> &'static str {
         match self {
             Self::FailedToFetch => "failed_to_fetch",
+            Self::FailedToParse => "failed_to_parse",
             Self::DoesNotExist => "does_not_exist",
             Self::Banned => "banned",
             Self::Proprietary => "proprietary",
@@ -152,7 +155,11 @@ impl ThingState {
 
     const fn is_successful_fetch(self) -> bool {
         match self {
-            Self::FailedToFetch | Self::DoesNotExist | Self::Banned | Self::Untried => false,
+            Self::FailedToFetch
+            | Self::FailedToParse
+            | Self::DoesNotExist
+            | Self::Banned
+            | Self::Untried => false,
             Self::Proprietary | Self::OpenSource => true,
         }
     }

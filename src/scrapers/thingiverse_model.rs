@@ -36,6 +36,7 @@ struct LicenseId {
     pub thingiverse_short: Option<&'static str>,
     pub spdx: Option<&'static str>,
 }
+
 pub static LICENSE_MAPPING: LazyLock<HashMap<&'static str, LicenseId>> = LazyLock::new(|| {
     vec![
         (
@@ -103,228 +104,21 @@ pub static LICENSE_MAPPING: LazyLock<HashMap<&'static str, LicenseId>> = LazyLoc
     .collect()
 });
 
-// #[derive(Deserialize, Debug)]
-// struct OshwaProject {
-//     #[serde(rename = "oshwaUid")]
-//    pub  oshwa_uid: String,
-// }
-
-// #[derive(Deserialize, Debug)]
-// struct Projects {
-//    pub  items: Vec<OshwaProject>,
-//    pub  limit: usize,
-//    pub  total: usize,
-// }
-
-// #[derive(Deserialize, Debug)]
-// struct ErrorDetail {
-//    pub  msg: String,
-//    pub  param: String,
-//    pub  location: String,
-// }
-
-// #[derive(Deserialize, Debug)]
-// #[serde(rename_all = "camelCase")]
-// pub struct Error {
-//    pub  status_code: usize,
-//    pub  error_code: String,
-//    pub  message: String,
-//    pub  details: Vec<ErrorDetail>,
-// }
-
-// impl Display for Error {
-//    pub  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         write!(f, "{self:#?}")
-//     }
-// }
-
-// impl std::error::Error for Error {}
-
-// #[derive(Deserialize, Debug)]
-// #[serde(rename_all = "camelCase")]
-// struct ErrorCont {
-//    pub  error: Error,
-// }
-
-// #[derive(Deserialize, Debug)]
-// enum ResponsiblePartyType {
-//     Company,
-//     Organization,
-//     Individual,
-// }
-
-// #[derive(Deserialize, Debug, Clone, Copy)]
-// enum Category {
-//     Agriculture,
-//     Arts,
-//     Education,
-//     Electronics,
-//     Environmental,
-//     Iot,
-//     Manufacturing,
-//     Other,
-//     Science,
-//     Tool,
-//     Wearables,
-
-//     #[serde(rename = "3D Printing")]
-//     _3DPrinting,
-//     Enclosure,
-//     #[serde(rename = "Home Connection")]
-//     HomeConnection,
-//     Robotics,
-//     Sound,
-//     Space,
-// }
-
-// impl Category {
-//     pub const fn to_cpc(self) -> Option<&'static str> {
-//         match self {
-//             Self::_3DPrinting => Some("B33Y"),
-//             Self::Enclosure => Some("F16M"),
-//             Self::HomeConnection => Some("H04W"),
-//             Self::Robotics => Some("B25J9/00"),
-//             Self::Sound => Some("H04R"),
-//             Self::Space => Some("B64G"),
-
-//             Self::Agriculture
-//             | Self::Arts
-//             | Self::Education
-//             | Self::Electronics
-//             | Self::Environmental
-//             | Self::Iot
-//             | Self::Manufacturing
-//             | Self::Other
-//             | Self::Science
-//             | Self::Tool
-//             | Self::Wearables => None,
-//         }
-//     }
-// }
-
-// /// License IDs as found on OSHWA.
-// ///
-// /// NOTE: It is important to keep the serde names
-// /// consistent with what OSHWA uses,
-// /// _not_ with SPDX!
-// #[derive(Deserialize, Clone, Copy, Debug)]
-// enum OshwaLicense {
-//     #[serde(rename = "None")]
-//     None,
-//     #[serde(rename = "Other")]
-//     Other,
-//     #[serde(rename = "BSD-2-Clause")]
-//     Bsd2Clause,
-//     #[serde(rename = "CC0-1.0", alias = "CC 0")]
-//     Cc0_1_0,
-//     #[serde(rename = "CC-BY-4.0", alias = "CC BY")]
-//     CcBy4_0,
-//     #[serde(rename = "CC-BY-SA-4.0", alias = "CC BY-SA")]
-//     CcBySa4_0,
-//     #[serde(rename = "CERN OHL", alias = "CERN")]
-//     CernOhl,
-//     #[serde(rename = "GPL")]
-//     Gpl,
-//     #[serde(rename = "GPL-3.0")]
-//     Gpl3_0,
-//     Solderpad,
-//     #[serde(rename = "TAPR", alias = "OHL")]
-//     TaprOhl,
-// }
-
-// #[derive(Deserialize, Debug)]
-// #[serde(rename_all = "camelCase")]
-// struct ApiProject {
-//    pub  responsible_party_type: ResponsiblePartyType,
-//    pub  responsible_party: String,
-//    pub  public_contact: String,
-//    pub  project_name: String,
-//    pub  project_version: String,
-//    pub  project_description: String,
-//     #[serde(rename = "oshwaUid")]
-//    pub  oshwa_uid: String,
-//    pub  hardware_license: Option<OshwaLicense>,
-//    pub  documentation_license: Option<OshwaLicense>,
-//    pub  software_license: Option<OshwaLicense>,
-//    pub  primary_type: Category,
-//    pub  additional_type: Category,
-//    pub  country: String,
-//    pub  certification_date: String, // TODO parse as "%Y-%m-%dT%H:%M%z"
-// }
-
-// impl ApiProject {
-//     pub fn license(&self) -> Option<SpdxLicenseExpression> {
-//         let mut license = self.hardware_license;
-
-//         if license.is_none() {
-//             return Some(LICENSE_UNKNOWN);
-//         }
-
-//         if matches!(license, Some(OshwaLicense::Other)) {
-//             license = self.documentation_license;
-//         }
-
-//         if license.is_none()
-//             || matches!(license, Some(OshwaLicense::Other))
-//             || matches!(license, Some(OshwaLicense::None))
-//         {
-//             return Some(LICENSE_UNKNOWN);
-//         }
-
-//         license.and_then(OshwaLicense::to_spdx_expr).map(Cow::from)
-//     }
-// }
-
-// impl OshwaLicense {
-//     pub const fn to_spdx_expr(self) -> Option<&'static str> {
-//         Some(match self {
-//             Self::Bsd2Clause => "BSD-2-Clause",
-//             // Self::CC0 => "CC0-1.0",
-//             Self::Cc0_1_0 => "CC0-1.0",
-//             // Self::CC_BY => "CC-BY-4.0",
-//             // Self::CC_BY_SA => "CC-BY-SA-4.0",
-//             Self::CcBy4_0 => "CC-BY-4.0",
-//             Self::CcBySa4_0 => "CC-BY-SA-4.0",
-//             // Self::CERN => "CERN-OHL-1.2",
-//             Self::CernOhl => "CERN-OHL-1.2",
-//             Self::Gpl => "GPL-3.0-or-later",
-//             Self::Gpl3_0 => "GPL-3.0-only",
-//             Self::Solderpad => "Apache-2.0 WITH SHL-2.1",
-//             Self::TaprOhl => "TAPR-OHL-1.0",
-//             Self::None | Self::Other => return None,
-//         })
-//     }
-// }
-
-// // impl Projects {
-// //     pub fn check_limit(&self) -> BoxResult<()> {
-// //         if self.query.category_members.len() == self.limits.category_members {
-// //             return Err(format!("Appropedia reached (and very likely surpassed) a total number of projects that is higher than the max fetch limit set in its API ({}); please inform the appropedia.org admins!", self.limits.category_members).into());
-// //         }
-// //         Ok(())
-// //     }
-// // }
-
-// impl From<Projects> for Vec<String> {
-//    pub  fn from(value: Projects) -> Self {
-//         value.items.iter().map(|p| p.oshwa_uid.clone()).collect()
-//     }
-// }
-
 type Int = isize;
-type t_string = String;
-type t_url = String;
-type t_datetime = String;
+type Url = String;
+type DateTime = String;
 
+/// Error message from the Thingiverse API,
+/// coming to us as JSON.
 #[derive(Deserialize, Debug)]
-pub struct SearchError {
-    pub error: t_string,
+pub struct TvApiError {
+    pub error: String,
 }
 
 pub static RE_ERR_MSG_DOES_NOT_EXIST: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)^Thing (\d+) does not exist$").unwrap());
 
-impl SearchError {
+impl TvApiError {
     pub fn is_thing_does_not_exist(&self) -> bool {
         RE_ERR_MSG_DOES_NOT_EXIST.is_match(self.error.as_str())
         // self.error.starts_with("Thing ") && self.error.ends_with(" does not exist")
@@ -348,8 +142,8 @@ impl SearchError {
     }
 }
 
-impl From<SearchError> for Error {
-    fn from(other: SearchError) -> Self {
+impl From<TvApiError> for Error {
+    fn from(other: TvApiError) -> Self {
         if other.is_thing_has_not_been_published() {
             Self::ProjectDoesNotExist
         } else if other.is_thing_is_under_moderation() {
@@ -365,13 +159,13 @@ impl From<SearchError> for Error {
     }
 }
 
-impl Display for SearchError {
+impl Display for TvApiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.error.fmt(f)
     }
 }
 
-impl std::error::Error for SearchError {}
+impl std::error::Error for TvApiError {}
 
 #[derive(Deserialize, Debug)]
 pub struct SearchSuccess {
@@ -382,20 +176,20 @@ pub struct SearchSuccess {
 #[derive(Deserialize, Debug)]
 pub struct Person {
     pub id: usize,
-    pub name: t_string,
-    pub first_name: t_string,
-    pub last_name: t_string,
-    pub url: t_url,
-    pub public_url: t_url,
-    pub thumbnail: t_url,
+    pub name: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub url: Url,
+    pub public_url: Url,
+    pub thumbnail: Url,
     pub count_of_followers: Int,
     pub count_of_following: Int,
     pub count_of_designs: Int,
     pub make_count: Int,
     pub accepts_tips: bool,
     pub is_following: bool,
-    pub location: t_string,
-    pub cover: t_url,
+    pub location: String,
+    pub cover: Url,
     pub is_admin: bool,
     pub is_moderator: bool,
     pub is_featured: bool,
@@ -404,46 +198,46 @@ pub struct Person {
 
 #[derive(Deserialize, Debug)]
 pub struct ImageSize {
-    pub r#type: t_string,
-    pub size: t_string,
-    pub url: t_url,
+    pub r#type: String,
+    pub size: String,
+    pub url: Url,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Image {
     pub id: Int,
-    pub url: t_url,
-    pub name: t_string,
+    pub url: Url,
+    pub name: String,
     pub sizes: Vec<ImageSize>,
-    pub added: t_datetime,
+    pub added: DateTime,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct PartDatum {
-    pub content: t_string,
+    pub content: String,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct PartDetails {
-    pub r#type: t_string,
-    pub name: t_string,
-    // pub required: Option<t_string>, // TODO FIXME this can be either string or bool :/
+    pub r#type: String,
+    pub name: String,
+    // pub required: Option<String>, // TODO FIXME this can be either string or bool :/
     pub data: Option<Vec<PartDatum>>,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Tag {
-    pub name: t_string,
-    pub url: t_url,
+    pub name: String,
+    pub url: Url,
     pub count: Int,
-    pub things_url: t_url,
-    pub absolute_url: t_string,
+    pub things_url: Url,
+    pub absolute_url: String,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct ZipFile {
-    pub name: t_string,
-    pub url: t_url,
+    pub name: String,
+    pub url: Url,
 }
 
 #[derive(Deserialize, Debug)]
@@ -455,13 +249,13 @@ pub struct ZipData {
 #[derive(Deserialize, Debug)]
 pub struct Thing {
     pub id: ThingId,
-    pub name: t_string,
-    pub thumbnail: t_url,
-    pub url: t_url,
-    pub public_url: t_url,
+    pub name: String,
+    pub thumbnail: Url,
+    pub url: Url,
+    pub public_url: Url,
     pub creator: Option<Person>,
-    pub added: Option<t_datetime>,
-    pub modified: Option<t_datetime>,
+    pub added: Option<DateTime>,
+    pub modified: Option<DateTime>,
     pub is_published: Int,
     pub is_wip: Option<Int>,
     pub is_featured: bool,
@@ -474,39 +268,39 @@ pub struct Thing {
     pub comment_count: Int,
     pub is_watched: Option<bool>,
     pub default_image: Option<Image>,
-    pub description: Option<t_string>,
-    pub instructions: Option<t_string>,
-    pub description_html: Option<t_string>,
-    pub instructions_html: Option<t_string>,
-    pub details: Option<t_string>,
+    pub description: Option<String>,
+    pub instructions: Option<String>,
+    pub description_html: Option<String>,
+    pub instructions_html: Option<String>,
+    pub details: Option<String>,
     pub details_parts: Option<Vec<PartDetails>>,
-    pub edu_details: Option<t_string>,
+    pub edu_details: Option<String>,
     pub edu_details_parts: Option<Vec<PartDetails>>,
-    pub license: Option<t_string>,
+    pub license: Option<String>,
     pub allows_derivatives: Option<bool>,
-    pub files_url: Option<t_url>,
-    pub images_url: Option<t_url>,
-    pub likes_url: Option<t_url>,
-    pub ancestors_url: Option<t_url>,
-    pub derivatives_url: Option<t_url>,
-    pub tags_url: Option<t_string>,
+    pub files_url: Option<Url>,
+    pub images_url: Option<Url>,
+    pub likes_url: Option<Url>,
+    pub ancestors_url: Option<Url>,
+    pub derivatives_url: Option<Url>,
+    pub tags_url: Option<String>,
     pub tags: Vec<Tag>,
-    pub categories_url: Option<t_url>,
+    pub categories_url: Option<Url>,
     pub file_count: Option<Int>,
     pub is_purchased: Option<Int>,
-    pub app_id: Option<t_string>,
+    pub app_id: Option<String>,
     pub download_count: Option<Int>,
     pub view_count: Option<Int>,
-    pub education: Option<HashMap<t_string, Value>>,
+    pub education: Option<HashMap<String, Value>>,
     pub remix_count: Option<Int>,
     pub make_count: Option<Int>,
     pub app_count: Option<Int>,
     pub root_comment_count: Option<Int>,
-    pub moderation: Option<t_string>,
+    pub moderation: Option<String>,
     pub is_derivative: Option<bool>,
     pub ancestors: Option<Vec<Value>>,
     // pub can_comment: Option<bool>,
-    pub type_name: Option<t_string>,
+    pub type_name: Option<String>,
     pub is_banned: bool,
     pub is_comments_disabled: Option<bool>,
     pub needs_moderation: Option<Int>,
@@ -621,16 +415,16 @@ impl Thing {
 #[derive(Deserialize, Debug)]
 struct File {
     pub id: Int,
-    pub name: t_string,
+    pub name: String,
     pub size: Int,
-    pub url: t_url,
-    pub public_url: t_url,
-    pub download_url: t_url,
-    pub threejs_url: t_url,
-    pub thumbnail: t_url,
+    pub url: Url,
+    pub public_url: Url,
+    pub download_url: Url,
+    pub threejs_url: Url,
+    pub thumbnail: Url,
     pub default_image: Image,
-    pub date: t_datetime,
-    pub formatted_size: t_string,
+    pub date: DateTime,
+    pub formatted_size: String,
     pub download_count: Int,
-    pub direct_url: t_url,
+    pub direct_url: Url,
 }

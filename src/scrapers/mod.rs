@@ -196,8 +196,12 @@ pub enum Error {
     DownloadMiddlewareError(#[from] reqwest_middleware::Error),
     #[error("{0} reached (and very likely surpassed) a total number of projects that is higher than the max fetch-limit set in its API ({1}); please inform the {0} admins!")]
     FetchLimitReached(HostingProviderId, usize),
-    #[error("Failed to deserialize a fetched (supposed) JSON result to our Rust model of it: {0}")]
-    DeserializeFailed(#[from] serde_json::Error),
+    #[error("Failed to deserialize a fetched result to JSON: {0}")]
+    DeserializeAsJsonFailed(#[from] serde_json::Error),
+    #[error(
+        "Failed to deserialize a fetched JSON result to our Rust model of the expected type: {0}"
+    )]
+    DeserializeFailed(serde_json::Error),
     #[error("OSHWA API returned error content: {0}")]
     OshwaApiError(#[from] oshwa::ApiError), // TODO Really, we should not have such scraper-specific errors here
     #[error("Hosting technology (e.g. platform) API returned error: {0}")]
