@@ -288,7 +288,7 @@ pub struct Thing {
     pub categories_url: Option<Url>,
     pub file_count: Option<Int>,
     pub is_purchased: Option<Int>,
-    pub app_id: Option<String>,
+    pub app_id: Option<Int>,
     pub download_count: Option<Int>,
     pub view_count: Option<Int>,
     pub education: Option<HashMap<String, Value>>,
