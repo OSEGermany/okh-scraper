@@ -101,7 +101,6 @@ impl super::Scraper for Scraper {
 impl Scraper {
     async fn fetch_project_names(
         &self,
-        // client: Arc<Box<Client>>,
         client: Arc<ClientWithMiddleware>,
     ) -> Result<Vec<String>, Error> {
         let params = [
@@ -119,7 +118,6 @@ impl Scraper {
                 .parse()
                 .unwrap(),
         );
-        // let client = reqwest::Client::new();
         let res = client
             .get("https://www.appropedia.org/w/api.php")
             .headers(headers)
@@ -136,7 +134,6 @@ impl Scraper {
     }
 
     async fn fetch_okhv1_manifest(
-        // client: Arc<Box<ClientWithMiddleware>>,
         client: Arc<ClientWithMiddleware>,
         project_title: &str,
     ) -> Result<RawContent, Error> {
@@ -144,7 +141,6 @@ impl Scraper {
         let project_title_encoded = tools::url_encode(&project_title_no_spaces);
         let manifest_dl_url = format!("https://www.appropedia.org/scripts/generateOpenKnowHowManifest.php?title={project_title_encoded}");
 
-        // let client = reqwest::Client::new();
         let res = client
             .get(manifest_dl_url)
             .send()

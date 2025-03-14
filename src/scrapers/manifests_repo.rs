@@ -39,7 +39,6 @@ and then scans it for manifest files.",
 
 pub static RE_MANIFEST_FILE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\.(toml|ya?ml|json)$").unwrap());
-// LazyLock::new(|| Regex::new(r"^(?i)\.(toml$").unwrap());
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
@@ -204,53 +203,4 @@ impl Scraper {
             .join(SCRAPER_TYPE.name)
             .join(tools::url_encode(url).as_ref())
     }
-
-    // async fn fetch_project_names() -> BoxResult<Vec<String>> {
-    //     let params = [
-    //         ("action", "query"),
-    //         ("format", "json"),
-    //         ("list", "categorymembers"),
-    //         ("cmlimit", "max"),
-    //         ("cmtitle", "Category:Projects"),
-    //     ];
-    //     let mut headers = HeaderMap::new();
-    //     headers.insert(ACCEPT, "application/json".parse().unwrap());
-    //     headers.insert(
-    //         USER_AGENT,
-    //         "okh-scraper github.com/iop-alliance/OpenKnowHow"
-    //             .parse()
-    //             .unwrap(),
-    //     );
-    //     let client = reqwest::Client::new();
-    //     let res = client
-    //         .get("https://www.appropedia.org/w/api.php")
-    //         .headers(headers)
-    //         .query(&params)
-    //         .send()
-    //         .await?
-    //         .json::<Projects>()
-    //         // .text()
-    //         .await?;
-    //     res.check_limit()?;
-    //     let project_titles: Vec<String> = res.into();
-    //     tracing::debug!("{:#?}", project_titles);
-    //     Ok(project_titles)
-    // }
-
-    // async fn fetch_okhv1_manifest(project_title: &str) -> BoxResult<String> {
-    //     let project_title_no_spaces = project_title.replace(" ", "_");
-    //     let project_title_encoded = tools::url_encode(&project_title_no_spaces);
-    //     let manifest_dl_url = format!("https://www.appropedia.org/scripts/generateOpenKnowHowManifest.php?title={project_title_encoded}");
-
-    //     let client = reqwest::Client::new();
-    //     let res = client
-    //         .get(manifest_dl_url)
-    //         .send()
-    //         .await?
-    //         // .json::<ProjectNames>()
-    //         .text()
-    //         .await?;
-    //     tracing::debug!("{res:#?}");
-    //     Ok(res)
-    // }
 }

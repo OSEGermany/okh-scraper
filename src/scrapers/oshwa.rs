@@ -79,61 +79,6 @@ pub struct Scraper {
     downloader: Arc<ClientWithMiddleware>, // TODO Check Is the Arc really still required, now that each scraper has its own downloader (before there was one shared by the whole application) -> if changed, change in all other scrapers too!
 }
 
-// impl Fetcher {
-//     // #[instrument]
-//     async fn fetch_all_XXXXXXXXXX(&self) -> Box<dyn Stream<Item = Result<Project, Error>>> {
-//         let rate_limiter = Arc::new(RateLimiter::direct(
-//             Quota::with_period(Duration::from_secs(5)).unwrap(),
-//         ));
-//         let client: Arc<Mutex<reqwest::Client>> = Arc::new(Mutex::new(reqwest::Client::new()));
-//         let access_token = self.config.access_token.clone();
-
-//         tracing::info!("Fetching {} - total ...", self.info().name);
-//         let res_projects = Self::fetch_projects_batch(client.clone(), &access_token, 1, 0).await;
-//         // Box::new(stream! {
-//         match res_projects {
-//             Err(err) => Box::new(stream! {
-//                 yield Err(err)
-//             }),
-//             Ok(projects_probe) => {
-//                 let total = projects_probe.total;
-//                 let batch_size = self.config.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
-//                 // let mut fetches = Vec::new();
-//                 let batches = total / batch_size;
-//                 let self_name = self.info().name;
-//                 Box::new(
-//                     stream! {
-//                         for batch_index in 0..batches {
-//                             let rate_limiter = rate_limiter.clone();
-//                             let client = client.clone();
-//                             // let client = reqwest::Client::new();
-//                             // fetches.push(
-//                             //     async move {
-//                                 tracing::info!(
-//                                     "Fetching {self_name} - batch {batch_index}/{batches} ..."
-//                                 );
-//                                 rate_limiter.until_ready().await;
-//                                 // let resp = reqwest::get(&url).await?;
-//                                 // tracing::debug!("Status for {}: {}", url, resp.status());
-//                                 // Result::<_, reqwest::Error>::Ok(())
-//                                 let offset = batch_index * batch_size;
-//                                 let batch_res = Self::fetch_projects_batch(client, &access_token, batch_size, offset).await;
-//                                 match batch_res {
-//                                     Err(err) => yield Err(err.into()),
-//                                     Ok(projects) => {
-//                                         for raw_proj in projects.items {
-//                                             yield Ok(Project::new(HostingUnitId::from((HOSTING_PROVIDER_ID, raw_proj.oshwa_uid))));
-//                                         }
-//                                     },
-//                                 }
-//                         }
-//                     }
-//                 )
-//             }
-//         }
-//     }
-// }
-
 #[async_trait(?Send)]
 impl IScraper for Scraper {
     fn info(&self) -> &'static TypeInfo {
@@ -141,16 +86,12 @@ impl IScraper for Scraper {
     }
 
     async fn scrape(&self) -> BoxStream<'static, Result<Project, Error>> {
-        // let client: Arc<Mutex<reqwest::Client>> = Arc::new(Mutex::new(reqwest::Client::new()));
-        // let client = reqwest::Client::new();
         let access_token = self.config.access_token.clone();
 
         tracing::info!("Fetching {} - total ...", self.info().name);
-        // let res_projects = Self::fetch_projects_batch(client.clone(), &access_token, 1, 0).await;
         let res_projects =
             Self::fetch_projects_batch(Arc::<_>::clone(&self.downloader), &access_token, 1, 0)
                 .await;
-        // Box::new(stream! {
         match res_projects {
             Err(err) => stream! {
                 yield Err(err)
@@ -159,25 +100,17 @@ impl IScraper for Scraper {
             Ok(projects_probe) => {
                 let total = projects_probe.total;
                 let batch_size = self.config.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
-                // let mut fetches = Vec::new();
                 let batches = total / batch_size;
                 let self_name = self.info().name;
                 let client = Arc::<_>::clone(&self.downloader);
-                // let client = self.config_all.downloader;
 
                 stream! {
                         for batch_index in 0..batches {
                             let rate_limiter = Arc::<_>::clone(&RATE_LIMITER);
-                            // let client = reqwest::Client::new();
-                            // fetches.push(
-                            //     async move {
                                 tracing::info!(
                                     "Fetching {self_name} - batch {batch_index}/{batches} ..."
                                 );
                                 rate_limiter.until_ready().await;
-                                // let resp = reqwest::get(&url).await?;
-                                // tracing::debug!("Status for {}: {}", url, resp.status());
-                                // Result::<_, reqwest::Error>::Ok(())
                                 let offset = batch_index * batch_size;
                                 let batch_res = Self::fetch_projects_batch(Arc::<_>::clone(&client), &access_token, batch_size, offset).await;
                                 match batch_res {
@@ -188,31 +121,10 @@ impl IScraper for Scraper {
                                         }
                                     },
                                 }
-                        //     }
-                        // );
                         }
                     }.boxed()
-
-                // join_all(fetches).await
-                // let pages: Result<Vec<Vec<String>>, Error> = join_all(fetches).await.into_iter().collect();
-
-                // let pages: Vec<Result<Vec<String>, Error>> = join_all(fetches).await;
-                // let pages_collected: (Vec<String>, Vec<Error>) =
-                //     pages
-                //         .into_iter()
-                //         .fold((Vec::new(), Vec::new()), |acc, res| {
-                //             match res {
-                //                 Ok(projects) => acc.0.append(&mut projects),
-                //                 Err(err) => acc.1.push(err),
-                //             }
-                //             acc
-                //         });
             }
         }
-        // let projects: Result<Vec<String>, Error> = pages.map(|bla| bla.into_iter().flatten().collect());
-
-        // fetch_batch(50, 0).await
-        // Ok(pages_collected)
     }
 }
 
@@ -427,27 +339,19 @@ impl From<Projects> for Vec<String> {
 impl Scraper {
     #[instrument]
     async fn fetch_projects_batch(
-        // client: Arc<Mutex<reqwest::Client>>,
-        // client: Arc<Box<reqwest::Client>>,
         client: Arc<ClientWithMiddleware>,
-        // client: &Box<reqwest::Client>,
-        // client: Arc<reqwest::Client>,
-        // client: &reqwest::Client,
         access_token: &str,
         batch_size: usize,
         offset: usize,
     ) -> Result<Projects, Error> {
         let params = [("limit", batch_size), ("offset", offset)];
         let mut headers = HeaderMap::new();
-        // headers.insert(ACCEPT, "application/json".parse().unwrap());
         headers.insert(USER_AGENT, USER_AGENT_VALUE.clone());
         headers.insert(
             AUTHORIZATION,
             format!("Bearer {access_token}").parse().unwrap(),
         );
         let res_projects_raw_json = client
-            // .lock()
-            // .unwrap()
             .get("https://certificationapi.oshwa.org/api/projects")
             .headers(headers)
             .query(&params)
@@ -467,99 +371,4 @@ impl Scraper {
             }
         })
     }
-
-    // async fn fetch_batch(
-    //     client: Arc<Mutex<reqwest::Client>>,
-    //     access_token: &str,
-    //     batch_size: usize,
-    //     offset: usize,
-    // ) -> Result<Vec<String>, Error> {
-    //     let res_projects = Self::fetch_projects_batch(client, access_token, batch_size, offset).await?;
-    //     // res_projects.check_limit()?;
-    //     let project_titles: Vec<String> = res_projects.into();
-    //     tracing::debug!("{:#?}", project_titles);
-    //     Ok(project_titles)
-    // }
 }
-
-// struct Page {
-//     total: usize,
-//     batch: usize,
-//     offset: usize,
-// }
-
-// struct PagesIterator<T> {
-//     total: usize,
-//     batch: usize,
-//     offset: usize,
-// }
-
-// impl<T> Iterator for PagesIterator<T> {
-//     type Item = T;
-
-//     fn next(&mut self) -> Option<T> {
-//         let result = match self.index {
-//             0 => self.pixel.r,
-//             1 => self.pixel.g,
-//             2 => self.pixel.b,
-//             _ => return None,
-//         };
-//         self.index += 1;
-//         Some(|url| {
-//             let rate_limiter = rate_limiter.clone();
-//             async move {
-//                 rate_limiter.until_ready().await;
-//                 let resp = reqwest::get(&url).await?;
-//                 tracing::debug!("Status for {}: {}", url, resp.status());
-//                 Result::<_, reqwest::Error>::Ok(())
-//             }
-//         })
-//     }
-// }
-
-// def fetch_all(self, start_over=True) -> Generator[FetchResult]:
-// last_offset = 0
-// num_fetched = 0
-// batch_size = self.BATCH_SIZE
-// if start_over:
-//     self._state_repository.delete(__hosting_id__)
-// else:
-//     state = self._state_repository.load(__hosting_id__)
-//     if state:
-//         last_offset = state.get("last_offset", 0)
-//         num_fetched = state.get("num_fetched", 0)
-
-// while True:
-//     log.debug("fetching projects %d to %d", num_fetched, num_fetched + batch_size)
-
-//     self._rate_limit.apply()
-//     response = self._session.get(
-//         url="https://certificationapi.oshwa.org/api/projects",
-//         params={
-//             "limit": batch_size,
-//             "offset": last_offset
-//         },
-//     )
-//     self._rate_limit.update()
-//     if response.status_code > 205:
-//         raise FetcherError(f"failed to fetch projects from {__hosting_id__}: {response.text}")
-
-//     data = response.json()
-//     last_visited = datetime.now(timezone.utc)
-//     for raw_project in data["items"]:
-//         hosting_unit_id = HostingUnitIdWebById(_hosting_id=__hosting_id__, project_id=raw_project['oshwaUid'])
-//         fetch_result = self.__fetch_one(hosting_unit_id, raw_project, last_visited)
-//         log.debug("yield fetch_result %s", hosting_unit_id)
-//         yield fetch_result
-
-//     # save current progress
-//     batch_size = data["limit"]  # in case the batch size will be lowered on the platform in some point in time
-//     num_fetched += len(data["items"])
-//     last_offset += batch_size
-//     if last_offset > data["total"]:
-//         break
-
-//     self._state_repository.store(__hosting_id__, {
-//         "last_offset": last_offset,
-//         "num_fetched": num_fetched,
-//     })
