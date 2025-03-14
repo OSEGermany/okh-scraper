@@ -33,7 +33,7 @@ struct LicenseId {
     pub spdx: Option<&'static str>,
 }
 
-pub static LICENSE_MAPPING: LazyLock<HashMap<&'static str, LicenseId>> = LazyLock::new(|| {
+static LICENSE_MAPPING: LazyLock<HashMap<&'static str, LicenseId>> = LazyLock::new(|| {
     vec![
         (
             "Creative Commons - Attribution",
