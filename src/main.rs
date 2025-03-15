@@ -104,7 +104,8 @@ async fn main() -> BoxResult<()> {
     // NOTE This way, one could still run one scraper in a container
     //      and one on the host, using different workdirs.
     //      -> Don't do that!
-    let workdir_lock_file_path = path::PathBuf::from(run_settings.database.path).join("okh-scraper-workdir.lock");
+    let workdir_lock_file_path =
+        path::PathBuf::from(run_settings.database.path).join("okh-scraper-workdir.lock");
     lock_file!(workdir_lock_file_path, workdir_lock_file);
 
     let mut fetch_streams = Vec::new();

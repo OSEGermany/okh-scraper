@@ -351,11 +351,11 @@ impl Scraper {
             Err(serde_err) => {
                 // if content == "You can only send 300 requests per 5 minutes. Please check https://www.thingiverse.com/developers/getting-started" {
                 if content.starts_with("You can only send ") {
-                    return Ok(ParsedApiResponse::RateLimitReached)
+                    return Ok(ParsedApiResponse::RateLimitReached);
                 } else {
-                    return Ok(ParsedApiResponse::Text(serde_err))
+                    return Ok(ParsedApiResponse::Text(serde_err));
                 }
-            },
+            }
         };
 
         let err_err = match serde_json::from_value::<TvApiError>(json_val.clone()) {
