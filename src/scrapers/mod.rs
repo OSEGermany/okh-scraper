@@ -184,6 +184,8 @@ pub enum Error {
     FailedGitClone(#[from] git2::Error),
     #[error("Some I/O problem: '{0}'")]
     IOError(#[from] std::io::Error), // TODO Too low level to be here, and no circumstances info
+    #[error("Reached (and surpassed) the API rate-limit")]
+    RateLimitReached,
     #[error("Failed to fetch a git repo (asynchronously): '{0}'")]
     FailedGitFetch(#[from] asyncgit::Error),
     #[error("Failed to do git operation: '{0}'")]

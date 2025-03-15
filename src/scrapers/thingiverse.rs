@@ -246,6 +246,11 @@ impl IScraper for Scraper {
                                     tracing::error!("Failed to fetch thing-ID {thing_id} (API returned error): {err_msg}");
                                     (ThingState::FailedToFetch, None)
                                 },
+                                Err(Error::RateLimitReached) => {
+                                    tracing::error!("Reached Thingiverse rate limit! Aborting the scraping process!");
+                                    yield Err(Error::RateLimitReached);
+                                    break;
+                                },
                                 Err(err) => {
                                     yield Err(err.into());
                                     continue;
@@ -279,6 +284,7 @@ enum ParsedApiResponse<T: serde::de::DeserializeOwned> {
     Error(TvApiError),
     Json(serde_json::Error),
     Text(serde_json::Error),
+    RateLimitReached,
 }
 
 impl<T: serde::de::DeserializeOwned> ParsedApiResponse<T> {
@@ -293,6 +299,7 @@ impl<T: serde::de::DeserializeOwned> ParsedApiResponse<T> {
             ParsedApiResponse::Error(err) => ParsedApiResponse::Error(err),
             ParsedApiResponse::Json(json) => ParsedApiResponse::Json(json),
             ParsedApiResponse::Text(err) => ParsedApiResponse::Text(err),
+            ParsedApiResponse::RateLimitReached => ParsedApiResponse::RateLimitReached,
         }
     }
 
@@ -302,6 +309,7 @@ impl<T: serde::de::DeserializeOwned> ParsedApiResponse<T> {
             ParsedApiResponse::Error(api_err) => Err(api_err.into()),
             ParsedApiResponse::Json(err) => Err(Error::DeserializeFailed(err)),
             ParsedApiResponse::Text(err) => Err(Error::DeserializeAsJsonFailed(err)),
+            ParsedApiResponse::RateLimitReached => Err(Error::RateLimitReached),
         }
     }
 }
@@ -340,7 +348,14 @@ impl Scraper {
     ) -> Result<ParsedApiResponse<T>, Error> {
         let json_val = match Self::parse_api_response_as_json(content) {
             Ok(json_val) => json_val,
-            Err(serde_err) => return Ok(ParsedApiResponse::Text(serde_err)),
+            Err(serde_err) => {
+                // if content == "You can only send 300 requests per 5 minutes. Please check https://www.thingiverse.com/developers/getting-started" {
+                if content.starts_with("You can only send ") {
+                    return Ok(ParsedApiResponse::RateLimitReached)
+                } else {
+                    return Ok(ParsedApiResponse::Text(serde_err))
+                }
+            },
         };
 
         let err_err = match serde_json::from_value::<TvApiError>(json_val.clone()) {
