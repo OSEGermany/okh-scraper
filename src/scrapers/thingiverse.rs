@@ -252,7 +252,7 @@ impl IScraper for Scraper {
                                     break;
                                 },
                                 Err(err) => {
-                                    yield Err(err.into());
+                                    yield Err(err);
                                     continue;
                                 },
                             }
