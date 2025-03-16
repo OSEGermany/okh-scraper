@@ -192,6 +192,7 @@ impl IScraper for Scraper {
             latest_thing_id,
             self.config.things_range_max.unwrap_or(ThingId::MAX),
         );
+        tracing::debug!("Fetching things between thing-IDs (including): {thing_id_range_min} - {thing_id_range_max}");
 
         tracing::info!("Preparing disc store ...");
 
