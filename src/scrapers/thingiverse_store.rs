@@ -585,14 +585,14 @@ can not be smaller then ({MIN_SLICE_SIZE})"
     pub async fn get_next_slice(&mut self) -> io::Result<Arc<sync::RwLock<ThingStoreSlice>>> {
         Ok(if (self.slices.len() as ThingId) < self.total_slices() {
             // create and return a new slice
-            let range_min = self.slices.len() as ThingId * self.slice_size;
-            let range_max = range_min + self.slice_size;
-            let base_dir = self.root_dir.join("data").join(range_min.to_string());
+            let slice_range_min = self.range_min + (self.slices.len() as ThingId * self.slice_size);
+            let slice_range_max = slice_range_min + self.slice_size;
+            let base_dir = self.root_dir.join("data").join(slice_range_min.to_string());
             ensure_dir_exists(&base_dir).await?;
             let slice = Arc::new(sync::RwLock::new(
-                ThingStoreSlice::new(base_dir, range_min, range_max).await?,
+                ThingStoreSlice::new(base_dir, slice_range_min, slice_range_max).await?,
             ));
-            self.slices.insert(range_min, slice.clone());
+            self.slices.insert(slice_range_min, slice.clone());
             slice
         } else {
             self.slices.iter().next().unwrap().1.clone()
