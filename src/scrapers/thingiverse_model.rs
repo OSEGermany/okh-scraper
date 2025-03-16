@@ -124,6 +124,10 @@ impl TvApiError {
         self.error == "Thing has not been published"
     }
 
+    pub fn is_thing_is_private(&self) -> bool {
+        self.error == "Thing is private"
+    }
+
     pub fn is_thing_is_under_moderation(&self) -> bool {
         self.error == "Thing is under moderation"
     }
@@ -142,7 +146,7 @@ impl From<TvApiError> for Error {
     fn from(other: TvApiError) -> Self {
         if other.is_thing_has_not_been_published() {
             Self::ProjectDoesNotExist
-        } else if other.is_thing_is_under_moderation() {
+        } else if other.is_thing_is_under_moderation() || other.is_thing_is_private() {
             Self::ProjectNotPublic
         } else if let Some(thing_id) = other.get_thing_id_if_not_exists() {
             Self::ProjectDoesNotExistId(HostingUnitId::WebById(HostingUnitIdWebById::from_parts(
