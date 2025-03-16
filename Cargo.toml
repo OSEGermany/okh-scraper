@@ -53,7 +53,7 @@ async-walkdir = "2.1"
 asyncgit = { version = "0.27", default-features = false, features = [ "vendor-openssl" ] }
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.5", features = ["cargo", "derive"] }
-cli_utils = { version = "0.9", features = ["logging"], package = "cli_utils_hoijui" }
+cli_utils = { version = "0.10", features = ["logging"], package = "cli_utils_hoijui" }
 config = "0.15"
 const_format = "0.2"
 crossbeam-channel = "0.5"
