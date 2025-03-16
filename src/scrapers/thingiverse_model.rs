@@ -214,7 +214,13 @@ pub struct Image {
 
 #[derive(Deserialize, Debug)]
 pub struct PartDatum {
-    pub content: String,
+    pub content: Option<String>,
+    // NOTE The following are commented out because we don't need them right now; this saves us parsing time.
+    // pub printer: Option<String>,
+    // pub rafts: Option<String>,
+    // pub supports: Option<String>,
+    // pub resolution: Option<String>,
+    // pub infill: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
