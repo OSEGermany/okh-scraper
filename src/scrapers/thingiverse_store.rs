@@ -404,28 +404,21 @@ we require the content of the thing, put it was not provided",
         construct_file_path(self.content_dir_path(), format!("{thing_id}.json"), temp)
     }
 
-    // fn write_thing_data(&self, data: Thing) -> Result<(), Box<dyn std::error::Error>> {
     async fn write_thing_data<D: AsRef<str>>(
         &self,
         thing_id: ThingId,
-        thing_json: D,
+        thing_raw_api_response_content: D,
     ) -> io::Result<()> {
         let temp_file_path = self.content_file_path(thing_id, true);
-        fs::write(&temp_file_path, thing_json.as_ref()).await?;
-        std::fs::rename(temp_file_path, self.content_file_path(thing_id, false))?;
+        fs::write(&temp_file_path, thing_raw_api_response_content.as_ref()).await?;
+        fs::rename(temp_file_path, self.content_file_path(thing_id, false)).await?;
 
         Ok(())
     }
 
-    // async fn write(&self, state: ThingState) -> Result<(), Box<dyn std::error::Error>> {
     async fn write(&self, state: ThingState) -> io::Result<()> {
         let temp_file_path = self.meta_file_path(state, true);
         {
-            // let mut things_meta_writer = csv::Writer::from_path(&temp_file_path)?;
-            // for thing_meta in self.meta.get(&state) {
-            //     things_meta_writer.serialize(thing_meta)?;
-            // }
-            // things_meta_writer.flush()?;
             let mut things_meta_writer =
                 csv_async::AsyncSerializer::from_writer(fs::File::create(&temp_file_path).await?);
             let values = self
@@ -442,7 +435,6 @@ we require the content of the thing, put it was not provided",
         Ok(())
     }
 
-    // async fn read(&mut self) -> Result<(), Box<dyn std::error::Error>> {
     async fn read(&mut self) -> io::Result<()> {
         let mut untried: BTreeSet<ThingId> = (self.range_min..=self.range_max).collect();
         for state in ThingState::iter() {
@@ -578,12 +570,6 @@ can not be smaller then ({MIN_SLICE_SIZE})"
     pub const fn total_slices(&self) -> ThingId {
         self.range() / self.slice_size
     }
-
-    // fn next(&mut self, lowest_thing_id: ThingId) -> io::Result<&mut Rc<ThingStoreSlice>> {
-    //     self.slices.get_mut(&lowest_thing_id).ok_or_else(||
-    //         io::Error::new(io::ErrorKind::NotFound, format!(
-    //             "Slice with lowest thing ID {lowest_thing_id} not found")))
-    // }
 
     /// The next slice to be scraped.
     /// This is either the store slice that has the oldest [`Self::last_scrape`] time,

@@ -247,7 +247,7 @@ impl IScraper for Scraper {
                                     (ThingState::FailedToFetch, None)
                                 },
                                 Err(Error::RateLimitReached) => {
-                                    tracing::error!("Reached Thingiverse rate limit! Aborting the scraping process!");
+                                    tracing::error!("Reached Thingiverse rate limit; Aborting the scraping process!");
                                     yield Err(Error::RateLimitReached);
                                     break;
                                 },
