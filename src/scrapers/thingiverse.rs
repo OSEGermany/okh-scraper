@@ -52,6 +52,15 @@ pub static SCRAPER_TYPE: LazyLock<TypeInfo> = LazyLock::new(|| TypeInfo {
 /// This has to be static,
 /// because if we created multiple instances of [`Scraper`],
 /// we would send too many requests from the same network address.
+///
+/// The rate limit set by Thingiverse is 300 requests per 5 minutes (== 300 seconds).
+/// Instead of using this limit as it is given,
+/// we resort to distributing it over the the whole time range,
+/// so we get one request per second.
+/// Doing it this way is probably less efficient,
+/// but it makes operating the service more robust when stopping and starting it frequently,
+/// which is likely the case during development phases,
+/// or on user machines (vs servers).
 pub static RATE_LIMITER: LazyLock<Arc<super::RL>> = LazyLock::new(|| {
     Arc::new(RateLimiter::direct(
         Quota::with_period(Duration::from_secs(1)).unwrap(),

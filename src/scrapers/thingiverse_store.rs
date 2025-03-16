@@ -419,6 +419,9 @@ we require the content of the thing, put it was not provided",
     async fn write(&self, state: ThingState) -> io::Result<()> {
         let temp_file_path = self.meta_file_path(state, true);
         {
+            // This block serves the purpose of closing the writer
+            // before the end of the function,
+            // so we can then move (rename) the file.
             let mut things_meta_writer =
                 csv_async::AsyncSerializer::from_writer(fs::File::create(&temp_file_path).await?);
             let values = self
@@ -532,6 +535,10 @@ can not be smaller then ({MIN_SLICE_SIZE})"
                 ),
             ));
         }
+        // NOTE We do not check that the range is perfectly divisible by the slice size,
+        //      because that would almost never pe possible,
+        //      if this was the last slice of the whole thingiverse things ID range,
+        //      as it would lay on a random/"odd" number.
         //         let range = range_max - range_min + 1;
         //         if range % slice_size != 0 {
         //             return Err(io::Error::new(
