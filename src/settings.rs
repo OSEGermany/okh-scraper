@@ -5,15 +5,23 @@
 #![allow(clippy::shadow_reuse)]
 
 use crate::scrapers::{self, Scraper};
-use cli_utils::BoxResult;
-use config::Config;
+use config::{Config, ConfigError};
 use reqwest_retry::RetryTransientMiddleware;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::borrow::Cow;
 use std::io::{self, BufRead, Write};
 use std::{collections::HashMap, path::PathBuf, rc::Rc, sync::Arc};
+use thiserror::Error;
 use typed_builder::TypedBuilder;
+
+#[derive(Error, Debug)]
+pub enum SettingsError {
+    #[error("Failed to load the basic/low-level configuration data: {0}")]
+    Config(#[from] ConfigError),
+    #[error("Failed to create a scraper from the basic/low-level configuration data: {0}")]
+    ScraperCreation(#[from] scrapers::CreationError),
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
@@ -56,7 +64,7 @@ impl IntermediateSettings {
         }
     }
 
-    pub fn finalize(self) -> BoxResult<Settings> {
+    pub fn finalize(self) -> Result<Settings, SettingsError> {
         let fetcher_factories = scrapers::assemble_factories();
         let mut fetchers = HashMap::new();
         let config_partial = Arc::new(self.partial());
@@ -102,7 +110,7 @@ impl IntermediateSettings {
     }
 }
 
-pub fn load() -> BoxResult<Settings> {
+pub fn load() -> Result<Settings, SettingsError> {
     let settings_loader = Config::builder()
         // Add in `./Settings.toml`
         // .add_source(config::File::with_name("examples/simple/Settings"))
