@@ -5,15 +5,16 @@
 mod cli;
 mod stream_test;
 
-use async_std::{fs, path};
+use async_std::{fs, io, path};
 use clap::crate_name;
-use cli_utils::BoxResult;
+use cli_utils::BoxError;
 use fs4::async_std::AsyncFileExt;
 use futures::{pin_mut, Stream, StreamExt};
 use std::pin::pin;
+use thiserror::Error;
 // use futures::future::select_all;
 use futures::stream::select_all;
-use okh_scraper::settings;
+use okh_scraper::settings::{self, SettingsError};
 
 use cli_utils::logging;
 use tracing::instrument;
@@ -30,15 +31,59 @@ fn print_version_and_exit(quiet: bool) {
     std::process::exit(0);
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum LockingErrorKind {
+    CreateFile,
+    OpenFile,
+    Locking,
+    Unlocking,
+}
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("Failed to initialize the logging/tracing system (1/2): {0}")]
+    LoggingInit(#[from] tracing_subscriber::util::TryInitError),
+    #[error("Failed to initialize the logging/tracing system (2/2): {0}")]
+    LoggingInit2(#[from] tracing_subscriber::reload::Error),
+    #[error("Failed to ensure exclusivity (locking): Is there already a scraper running (on the same machine or in an (other) container/VM?)? - error-kind: {0:#?}, lock-file: '{1:#?}'")]
+    Locking(LockingErrorKind, path::PathBuf, Option<BoxError>),
+    #[error("Failed to initialize/construct the configuration: {0}")]
+    Settings(#[from] SettingsError),
+    #[error("Database/Workdir '{0:#?}' does not exist")]
+    MissingDatabaseDir(path::PathBuf),
+}
+
 macro_rules! lock_file {
     ($path_var:ident, $file_var:ident) => {
         if !$path_var.exists().await {
-            fs::File::create(&$path_var).await?;
+            fs::File::create(&$path_var).await.map_err(|err| {
+                Error::Locking(
+                    LockingErrorKind::CreateFile,
+                    $path_var.clone(),
+                    Some(err.into()),
+                )
+            })?;
         }
         tracing::debug!("Preparing to lock file '{}' ...", $path_var.display());
-        let $file_var = fs::File::open(&$path_var).await?;
-        if !$file_var.try_lock_exclusive()? {
-            return Err(format!("Failed to lock file '{}'", $path_var.display()).into());
+        let $file_var = fs::File::open(&$path_var).await.map_err(|err| {
+            Error::Locking(
+                LockingErrorKind::OpenFile,
+                $path_var.clone(),
+                Some(err.into()),
+            )
+        })?;
+        if !$file_var.try_lock_exclusive().map_err(|err| {
+            Error::Locking(
+                LockingErrorKind::Locking,
+                $path_var.clone(),
+                Some(err.into()),
+            )
+        })? {
+            return Err(Error::Locking(
+                LockingErrorKind::Locking,
+                $path_var.clone(),
+                None,
+            ));
         }
         tracing::debug!("Obtained lock on file '{}'.", $path_var.display());
     };
@@ -47,14 +92,20 @@ macro_rules! lock_file {
 macro_rules! unlock_file {
     ($path_var:ident, $file_var:ident) => {
         tracing::trace!("Releasing lock on file '{}' ...", $path_var.display());
-        $file_var.unlock()?;
+        $file_var.unlock().map_err(|err| {
+            Error::Locking(
+                LockingErrorKind::Unlocking,
+                $path_var.clone(),
+                Some(err.into()),
+            )
+        })?;
         tracing::info!("Released lock on file '{}'.", $path_var.display());
     };
 }
 
 #[tokio::main]
 #[instrument]
-async fn main() -> BoxResult<()> {
+async fn main() -> Result<(), Error> {
     let log_reload_handle = logging::setup(crate_name!())?;
     let args = cli::args_matcher().get_matches();
 
@@ -86,6 +137,12 @@ async fn main() -> BoxResult<()> {
     lock_file!(system_lock_file_path, system_lock_file);
 
     let run_settings = settings::load()?;
+    // create the async version of the workdir path
+    let workdir = path::PathBuf::from(&run_settings.database.path);
+    // ensure the workdir exists
+    if !workdir.exists().await {
+        return Err(Error::MissingDatabaseDir(workdir));
+    }
 
     // With this we try to enforce
     // that at most one scraper instance is running at a time,
@@ -104,8 +161,7 @@ async fn main() -> BoxResult<()> {
     // NOTE This way, one could still run one scraper in a container
     //      and one on the host, using different workdirs.
     //      -> Don't do that!
-    let workdir_lock_file_path =
-        path::PathBuf::from(&run_settings.database.path).join("okh-scraper-workdir.lock");
+    let workdir_lock_file_path = workdir.join("okh-scraper-workdir.lock");
     lock_file!(workdir_lock_file_path, workdir_lock_file);
 
     let mut fetch_streams = Vec::new();
