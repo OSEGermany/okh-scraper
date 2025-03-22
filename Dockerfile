@@ -18,7 +18,7 @@ RUN apt-get update && \
 
 COPY ["Cargo.*", "."]
 COPY ["src", "./src"]
-RUN cargo install --path .
+RUN cargo install --locked --path .
 
 # Then use a minimal container
 # and only copy over the required files
