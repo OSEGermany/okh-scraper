@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use super::{
-    create_downloader_retry, CreationError, Error, Factory as IScraperFactory, PlatformBaseConfig,
-    RetryConfig, Scraper as IScraper, TypeInfo,
+    create_downloader_retry, Config as IConfig, CreationError, Error, Factory as IScraperFactory,
+    PlatformBaseConfig, RetryConfig, Scraper as IScraper, TypeInfo,
 };
 use crate::model::hosting_type::HostingType;
 use crate::structured_content::{Chunk, SerializationFormat};
@@ -38,7 +38,28 @@ and then each projects (generated) OKHv1 YAML manifest is downloaded separately.
     hosting_type: HostingType::Appropedia,
 });
 
-pub type Config = PlatformBaseConfig;
+/// Like [`super::PlatformBaseConfig`].
+#[derive(Deserialize, Debug)]
+pub struct Config {
+    retries: Option<u32>,
+    timeout: Option<u64>,
+}
+
+impl IConfig for Config {
+    fn hosting_provider(&self) -> HostingProviderId {
+        HOSTING_PROVIDER_ID
+    }
+}
+
+impl RetryConfig for Config {
+    fn retries(&self) -> Option<u32> {
+        self.retries
+    }
+
+    fn timeout(&self) -> Option<u64> {
+        self.timeout
+    }
+}
 
 pub struct ScraperFactory;
 
@@ -121,7 +142,7 @@ impl Scraper {
             .json::<Projects>()
             // .text()
             .await?;
-        res.check_limit(self.config.hosting_provider)?;
+        res.check_limit(self.config.hosting_provider())?;
         let project_titles: Vec<String> = res.into();
         tracing::debug!("{:#?}", project_titles);
         Ok(project_titles)

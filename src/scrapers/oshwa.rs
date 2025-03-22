@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use super::{create_downloader_retry_ac, RetryConfig};
+use super::{create_downloader_retry_ac, AccessControlConfig, RetryConfig};
 use super::{
-    ACPlatformBaseConfig, CreationError, Error, Factory as IScraperFactory, Scraper as IScraper,
+    Config as IConfig, CreationError, Error, Factory as IScraperFactory, Scraper as IScraper,
     TypeInfo,
 };
 use crate::{
@@ -47,7 +47,40 @@ pub static RATE_LIMITER: LazyLock<Arc<super::RL>> = LazyLock::new(|| {
 
 const DEFAULT_BATCH_SIZE: usize = 100;
 
-type Config = ACPlatformBaseConfig;
+/// Like [`super::ACPlatformBaseConfig`].
+#[derive(Deserialize, Debug)]
+pub struct Config {
+    /// Number of retries for a specific fetch,
+    /// e.g. a batch or single project.
+    retries: Option<u32>,
+    /// Request timeout in milliseconds (ms)
+    timeout: Option<u64>,
+    /// Batch size when fetching multiple items (e.g. projects)
+    batch_size: Option<usize>,
+    access_token: String,
+}
+
+impl IConfig for Config {
+    fn hosting_provider(&self) -> HostingProviderId {
+        HOSTING_PROVIDER_ID
+    }
+}
+
+impl RetryConfig for Config {
+    fn retries(&self) -> Option<u32> {
+        self.retries
+    }
+
+    fn timeout(&self) -> Option<u64> {
+        self.timeout
+    }
+}
+
+impl AccessControlConfig for Config {
+    fn access_token(&self) -> &str {
+        &self.access_token
+    }
+}
 
 pub struct ScraperFactory;
 
