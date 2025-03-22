@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2021 - 2024 Robin Vobruba <hoijui.quaero@gmail.com>
+# SPDX-FileCopyrightText: 2021 - 2025 Robin Vobruba <hoijui.quaero@gmail.com>
 #
 # SPDX-License-Identifier: Unlicense
 
@@ -58,7 +58,7 @@ jobs:
           submodules: true
 
       - name: "Mark the build scripts as Git-ignored, locally"
-        run: if ! grep -q -r "^/run/rp/\$" .git/info/exclude; then echo '/run/rp/' >> .git/info/exclude; fi
+        run: run/rp/setup
 
       - name: "Install STOML (BASH TOML parser)"
         run: run/rp/install_stoml
@@ -130,7 +130,7 @@ jobs:
         submodules: true
 
     - name: "Mark the build scripts as Git-ignored, locally"
-      run: if ! grep -q -r "^/run/rp/\$" .git/info/exclude; then echo '/run/rp/' >> .git/info/exclude; fi
+      run: run/rp/setup
 
     - name: "Install STOML (BASH TOML parser)"
       run: |
