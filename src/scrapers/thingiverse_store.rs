@@ -381,7 +381,7 @@ we require the content of the thing, put it was not provided",
         Ok(())
     }
 
-    /// Returned a cloned list of the [`ThingState::OpenSource`]` [`ThingMeta`]s.
+    /// Returned a cloned list of the [`ThingState::OpenSource`] [`ThingMeta`]s.
     #[must_use]
     pub fn cloned_os(&self) -> VecDeque<ThingId> {
         self.meta

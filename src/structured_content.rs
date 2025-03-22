@@ -64,6 +64,10 @@ pub enum RawContent {
 }
 
 impl RawContent {
+    /// # Panics
+    ///
+    /// Panics if `self` is of the `Bytes` variant,
+    /// and can not be interpreted as a UTF-8 string not a string.
     #[must_use]
     pub fn as_string(&self) -> &str {
         match self {
@@ -102,6 +106,11 @@ pub struct Chunk<P: Serialize + DeserializeOwned> {
 }
 
 impl<P: Serialize + DeserializeOwned> Chunk<P> {
+    /// # Errors
+    ///
+    /// - Path is not a file-path or the file has no extension
+    /// - File-extension is not valid UTF-8"
+    /// - Unsupported file extension
     pub fn from_file(file: PathBuf) -> BoxResult<Self> {
         Ok(Self {
             format: SerializationFormat::try_from(file.as_path())?,
@@ -127,19 +136,5 @@ impl<P: Serialize + DeserializeOwned> Chunk<P> {
 
     pub const fn file(&self) -> Option<&PathBuf> {
         self.file.as_ref()
-    }
-
-    pub fn content(&mut self) -> &RawContent {
-        if self.content.is_none() {
-            match self.file.as_ref() {
-                Some(file) => {
-                    let file_contents_str = fs::read_to_string(file).unwrap();
-                    let content = RawContent::String(file_contents_str);
-                    self.content = Some(content);
-                }
-                None => panic!("Neither content nor file are given; this should not be possible"),
-            }
-        }
-        self.content.as_ref().unwrap()
     }
 }

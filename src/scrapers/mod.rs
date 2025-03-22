@@ -239,6 +239,11 @@ pub trait Factory {
 
     /// Creates a new instance of this type of fetcher,
     /// following the supplied configuration.
+    ///
+    /// # Errors
+    ///
+    /// - Unknown fetcher type
+    /// - Invalid config for fetcher type
     fn create(
         &self,
         config_all: Arc<PartialSettings>,

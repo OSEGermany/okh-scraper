@@ -110,6 +110,11 @@ impl IntermediateSettings {
     }
 }
 
+/// # Errors
+///
+/// - the config loader fails to build
+/// - settings failed to load and deserialize into intermediate settings
+/// - the intermediate settings fail to finalize into the final settings
 pub fn load() -> Result<Settings, SettingsError> {
     let settings_loader = Config::builder()
         // Add in `./Settings.toml`
