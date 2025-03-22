@@ -69,12 +69,12 @@ impl IntermediateSettings {
         let mut fetchers = HashMap::new();
         let config_partial = Arc::new(self.partial());
         for (fetcher_id, properties) in self.fetchers {
-            let fetcher_type = properties
-                .get("fetcher_type")
-                .expect("fetcher section requires property 'fetcher_type'")
+            let scraper_type = properties
+                .get("scraper_type")
+                .expect("fetcher section requires property 'scraper_type'")
                 .as_str()
-                .expect("property 'fetcher_type' needs to be a string");
-            tracing::debug!("Fetcher '{fetcher_id}' has type: '{fetcher_type}' - parsing ...");
+                .expect("property 'scraper_type' needs to be a string");
+            tracing::debug!("Fetcher '{fetcher_id}' has type: '{scraper_type}' - parsing ...");
             if [
                 "none",
                 "appropedia",
@@ -85,17 +85,17 @@ impl IntermediateSettings {
                 "oshwa",
                 // "thingiverse",
             ]
-            .contains(&fetcher_type)
+            .contains(&scraper_type)
             {
                 // TODO HACK
                 tracing::debug!(
-                    "ignoring '{fetcher_id}' because type not yet implemented: '{fetcher_type}'"
+                    "ignoring '{fetcher_id}' because type not yet implemented: '{scraper_type}'"
                 );
                 continue;
             }
             let factory = fetcher_factories
-                .get(fetcher_type)
-                .unwrap_or_else(|| panic!("No fetcher found for type '{fetcher_type}'"));
+                .get(scraper_type)
+                .unwrap_or_else(|| panic!("No fetcher found for type '{scraper_type}'"));
             let fetcher = factory.create(
                 Arc::<PartialSettings>::clone(&config_partial),
                 properties

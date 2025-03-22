@@ -81,7 +81,7 @@ pub trait AccessControlConfig: Config {
 #[derive(Deserialize, Debug)]
 pub struct PlatformBaseConfig {
     hosting_provider: HostingProviderId,
-    // fetcher_type: String,
+    // scraper_type: String,
     /// Number of retries for a specific fetch,
     /// e.g. a batch or single project.
     retries: Option<u32>,
@@ -119,7 +119,7 @@ impl RetryConfig for PlatformBaseConfig {
 #[derive(Deserialize, Debug)]
 pub struct ACPlatformBaseConfig {
     hosting_provider: HostingProviderId,
-    // fetcher_type: String,
+    // scraper_type: String,
     /// Number of retries for a specific fetch,
     /// e.g. a batch or single project.
     retries: Option<u32>,
@@ -166,9 +166,9 @@ impl AccessControlConfig for ACPlatformBaseConfig {
 /// Thrown when creating a new [`Scraper`] failed.
 #[derive(Error, Debug)]
 pub enum CreationError {
-    #[error("Unknown fetcher type: '{0}'")]
+    #[error("Unknown scraper type: '{0}'")]
     UnknownFetcherType(String),
-    #[error("Invalid config for fetcher type '{0}': {1:#?}")]
+    #[error("Invalid config for scraper type '{0}': {1:#?}")]
     InvalidConfig(String, Option<serde_json::Error>),
 }
 
@@ -176,9 +176,9 @@ pub enum CreationError {
 /// or while trying to scrape a single or a batch of projects.
 #[derive(Error, Debug)]
 pub enum Error {
-    // #[error("Unknown fetcher type: '{0}'")]
+    // #[error("Unknown scraper type: '{0}'")]
     // UnknownFetcherType(String),
-    // #[error("Invalid config for fetcher type '{0}': {1}")]
+    // #[error("Invalid config for scraper type '{0}': {1}")]
     // InvalidConfig(String, Value),
     #[error("Failed to clone a git repo (synchronously): '{0}'")]
     FailedGitClone(#[from] git2::Error),
@@ -242,8 +242,8 @@ pub trait Factory {
     ///
     /// # Errors
     ///
-    /// - Unknown fetcher type
-    /// - Invalid config for fetcher type
+    /// - Unknown scraper type
+    /// - Invalid config for scraper type
     fn create(
         &self,
         config_all: Arc<PartialSettings>,

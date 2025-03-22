@@ -73,7 +73,7 @@ pub static RATE_LIMITER: LazyLock<Arc<super::RL>> = LazyLock::new(|| {
 #[derive(Deserialize, Debug)]
 pub struct ThingiverseConfig {
     // hosting_provider: HostingProviderId,
-    // fetcher_type: String,
+    // scraper_type: String,
     /// Number of retries for a specific fetch,
     /// e.g. a batch or single project.
     retries: Option<u32>,
