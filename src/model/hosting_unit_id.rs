@@ -72,7 +72,7 @@ pub enum HostingUnitId {
 impl From<(HostingProviderId, String)> for HostingUnitId {
     fn from(value: (HostingProviderId, String)) -> Self {
         if matches!(value.0, HostingProviderId::Inapplicable) {
-            panic!("Code-logic should never allow  to get here");
+            panic!("Code-logic should never allow to get here");
         }
         Self::WebById(HostingUnitIdWebById {
             hosting_provider: value.0,

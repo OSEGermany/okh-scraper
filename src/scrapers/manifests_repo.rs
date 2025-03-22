@@ -170,7 +170,7 @@ impl IScraper for Scraper {
                 "Cloning remote repo '{fetch_url}' to local dir '{}' - done.",
                 repo_local_dir.display()
             );
-        };
+        }
         tracing::trace!(
             "Searching manifests in local dir '{}' ...",
             repo_local_dir.display()

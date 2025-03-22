@@ -69,7 +69,11 @@ impl IntermediateSettings {
         let mut fetchers = HashMap::new();
         let config_partial = Arc::new(self.partial());
         for (fetcher_id, properties) in self.fetchers {
-            let fetcher_type = properties.get("fetcher_type").unwrap().as_str().unwrap();
+            let fetcher_type = properties
+                .get("fetcher_type")
+                .expect("fetcher section requires property 'fetcher_type'")
+                .as_str()
+                .expect("property 'fetcher_type' needs to be a string");
             tracing::debug!("Fetcher '{fetcher_id}' has type: '{fetcher_type}' - parsing ...");
             if [
                 "none",
@@ -127,8 +131,7 @@ pub fn load() -> Result<Settings, SettingsError> {
 
     let intermediate_settings = settings_loader
         // .try_deserialize::<HashMap<String, Value>>()
-        .try_deserialize::<IntermediateSettings>()
-        .unwrap();
+        .try_deserialize::<IntermediateSettings>()?;
 
     tracing::debug!("{intermediate_settings:#?}");
 

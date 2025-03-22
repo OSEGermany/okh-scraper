@@ -120,14 +120,17 @@ impl TvApiError {
         // self.error.starts_with("Thing ") && self.error.ends_with(" does not exist")
     }
 
+    #[must_use]
     pub fn is_thing_has_not_been_published(&self) -> bool {
         self.error == "Thing has not been published"
     }
 
+    #[must_use]
     pub fn is_thing_is_private(&self) -> bool {
         self.error == "Thing is private"
     }
 
+    #[must_use]
     pub fn is_thing_is_under_moderation(&self) -> bool {
         self.error == "Thing is under moderation"
     }
@@ -173,6 +176,7 @@ pub struct SearchSuccess {
     pub hits: Vec<Thing>,
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Deserialize, Debug)]
 pub struct Person {
     pub id: usize,

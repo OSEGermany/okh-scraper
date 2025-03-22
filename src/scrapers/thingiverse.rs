@@ -174,7 +174,7 @@ impl IScraper for Scraper {
     async fn scrape(&self) -> BoxStream<'static, Result<Project, Error>> {
         let client = Arc::<_>::clone(&self.downloader);
 
-        let latest_thing_id = match Self::fetch_latest_thing_id(client.clone()).await {
+        let latest_thing_id = match Self::fetch_latest_thing_id(Arc::<_>::clone(&client)).await {
             Err(err) => {
                 tracing::error!("Failed to fetch latest thing-ID: {err}");
                 ok_or_return_err_stream!(Err(err));
@@ -225,7 +225,7 @@ impl IScraper for Scraper {
                     // We want this time to be as close as possible to the fetch,
                     // but rather before then after it.
                     let fetch_time = Utc::now();
-                    let (state, raw_api_response) = match Self::fetch_thing(client.clone(), thing_id).await {
+                    let (state, raw_api_response) = match Self::fetch_thing(Arc::<_>::clone(&client), thing_id).await {
                     // let (state, raw_api_response) = match Ok::<(String, &str), Error>(("".to_string(), "")) {
                         Err(err) => {
                             tracing::error!("Failed to fetch thing-ID {thing_id} (low-level/network-issue): {err}");
@@ -241,10 +241,10 @@ impl IScraper for Scraper {
                                         (ThingState::Proprietary, None)
                                     }
                                 },
-                                Err(Error::DeserializeFailed(err)) | Err(Error::DeserializeAsJsonFailed(err)) => {
+                                Err(Error::DeserializeFailed(err) | Error::DeserializeAsJsonFailed(err)) => {
                                     (ThingState::FailedToParse, Some(raw_api_response))
                                 },
-                                Err(Error::ProjectDoesNotExist) | Err(Error::ProjectDoesNotExistId(_)) => {
+                                Err(Error::ProjectDoesNotExist | Error::ProjectDoesNotExistId(_)) => {
                                     tracing::info!("Thing {thing_id} does not exist");
                                     (ThingState::DoesNotExist, None)
                                 },
@@ -303,23 +303,21 @@ impl<T: serde::de::DeserializeOwned> ParsedApiResponse<T> {
         success_mapper: impl FnOnce(T) -> NT,
     ) -> ParsedApiResponse<NT> {
         match self {
-            ParsedApiResponse::Success(success) => {
-                ParsedApiResponse::Success(success_mapper(success))
-            }
-            ParsedApiResponse::Error(err) => ParsedApiResponse::Error(err),
-            ParsedApiResponse::Json(json) => ParsedApiResponse::Json(json),
-            ParsedApiResponse::Text(err) => ParsedApiResponse::Text(err),
-            ParsedApiResponse::RateLimitReached => ParsedApiResponse::RateLimitReached,
+            Self::Success(success) => ParsedApiResponse::Success(success_mapper(success)),
+            Self::Error(err) => ParsedApiResponse::Error(err),
+            Self::Json(json) => ParsedApiResponse::Json(json),
+            Self::Text(err) => ParsedApiResponse::Text(err),
+            Self::RateLimitReached => ParsedApiResponse::RateLimitReached,
         }
     }
 
     fn into_result(self) -> Result<T, Error> {
         match self {
-            ParsedApiResponse::Success(success) => Ok(success),
-            ParsedApiResponse::Error(api_err) => Err(api_err.into()),
-            ParsedApiResponse::Json(err) => Err(Error::DeserializeFailed(err)),
-            ParsedApiResponse::Text(err) => Err(Error::DeserializeAsJsonFailed(err)),
-            ParsedApiResponse::RateLimitReached => Err(Error::RateLimitReached),
+            Self::Success(success) => Ok(success),
+            Self::Error(api_err) => Err(api_err.into()),
+            Self::Json(err) => Err(Error::DeserializeFailed(err)),
+            Self::Text(err) => Err(Error::DeserializeAsJsonFailed(err)),
+            Self::RateLimitReached => Err(Error::RateLimitReached),
         }
     }
 }
@@ -360,11 +358,11 @@ impl Scraper {
             Ok(json_val) => json_val,
             Err(serde_err) => {
                 // if content == "You can only send 300 requests per 5 minutes. Please check https://www.thingiverse.com/developers/getting-started" {
-                if content.starts_with("You can only send ") {
-                    return Ok(ParsedApiResponse::RateLimitReached);
+                return Ok(if content.starts_with("You can only send ") {
+                    ParsedApiResponse::RateLimitReached
                 } else {
-                    return Ok(ParsedApiResponse::Text(serde_err));
-                }
+                    ParsedApiResponse::Text(serde_err)
+                });
             }
         };
 

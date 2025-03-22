@@ -70,7 +70,7 @@ fn last_scrape_file<P: AsRef<Path>>(dir: P, temp: bool) -> PathBuf {
     construct_file_path(dir, LAST_SCRAPE_FILE_NAME, temp)
 }
 
-async fn write_last_scrape<P: AsRef<Path> + Send>(
+async fn write_last_scrape<P: AsRef<Path> + Send + Sync>(
     temp_file: P,
     file: P,
     last_scrape: DateTime<Utc>,
@@ -271,7 +271,7 @@ impl Ord for ThingMeta {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match self.state.cmp(&other.state) {
             core::cmp::Ordering::Equal => {}
-            ord => return ord,
+            ord @ (core::cmp::Ordering::Less | core::cmp::Ordering::Greater) => return ord,
         }
         self.last_scrape.cmp(&other.last_scrape)
     }
@@ -330,7 +330,7 @@ must be >= range_min ({range_min})"
     /// Returns the number of things within this slice with the given state.
     #[must_use]
     pub fn num(&self, state: ThingState) -> ThingId {
-        self.meta.get(&state).unwrap().len() as ThingId
+        ThingId::try_from(self.meta.get(&state).unwrap().len()).unwrap()
     }
 
     #[must_use]
@@ -460,9 +460,9 @@ we require the content of the thing, put it was not provided",
         let loaded_thing_meta_count = self
             .meta
             .values()
-            .map(|v| v.len() as ThingId)
+            .map(|v| ThingId::try_from(v.len()).unwrap())
             .sum::<ThingId>();
-        if loaded_thing_meta_count + untried.len() as ThingId != self.size() {
+        if loaded_thing_meta_count + ThingId::try_from(untried.len()).unwrap() != self.size() {
             let msg = format!(
                 "Something is wrong with thing-slice {}-{} on disc: \
 {} unique things in meta file, {} things (IDs) missing, \
@@ -583,23 +583,26 @@ can not be smaller then ({MIN_SLICE_SIZE})"
     /// or if not all slices have been scraped yet,
     /// the un-scraped one with the lowest range.
     pub async fn get_next_slice(&mut self) -> io::Result<Arc<sync::RwLock<ThingStoreSlice>>> {
-        Ok(if (self.slices.len() as ThingId) < self.total_slices() {
-            // create and return a new slice
-            let slice_range_min = self.range_min + (self.slices.len() as ThingId * self.slice_size);
-            let slice_range_max = slice_range_min + self.slice_size;
-            let base_dir = self.root_dir.join("data").join(slice_range_min.to_string());
-            ensure_dir_exists(&base_dir).await?;
-            let slice = Arc::new(sync::RwLock::new(
-                ThingStoreSlice::new(base_dir, slice_range_min, slice_range_max).await?,
-            ));
-            self.slices.insert(slice_range_min, slice.clone());
-            slice
-        } else {
-            self.slices.iter().next().unwrap().1.clone()
-        })
+        Ok(
+            if ThingId::try_from(self.slices.len()).unwrap() < self.total_slices() {
+                // create and return a new slice
+                let slice_range_min = self.range_min
+                    + (ThingId::try_from(self.slices.len()).unwrap() * self.slice_size);
+                let slice_range_max = slice_range_min + self.slice_size;
+                let base_dir = self.root_dir.join("data").join(slice_range_min.to_string());
+                ensure_dir_exists(&base_dir).await?;
+                let slice = Arc::new(sync::RwLock::new(
+                    ThingStoreSlice::new(base_dir, slice_range_min, slice_range_max).await?,
+                ));
+                self.slices.insert(slice_range_min, Arc::<_>::clone(&slice));
+                slice
+            } else {
+                Arc::<_>::clone(self.slices.iter().next().unwrap().1)
+            },
+        )
     }
 
-    pub fn set_last_scrape(&mut self, time: DateTime<Utc>) {
+    pub const fn set_last_scrape(&mut self, time: DateTime<Utc>) {
         self.last_scrape = time;
     }
 }
