@@ -168,8 +168,8 @@ impl AccessControlConfig for ACPlatformBaseConfig {
 pub enum CreationError {
     #[error("Unknown fetcher type: '{0}'")]
     UnknownFetcherType(String),
-    #[error("Invalid config for fetcher type '{0}': {1}")]
-    InvalidConfig(String, Value),
+    #[error("Invalid config for fetcher type '{0}': {1:#?}")]
+    InvalidConfig(String, Option<serde_json::Error>),
 }
 
 /// Thrown when a [`Scraper`] failed to scrape in general,
