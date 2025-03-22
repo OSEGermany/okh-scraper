@@ -81,6 +81,7 @@ impl IntermediateSettings {
                 "forgejo",
                 "github",
                 "gitlab",
+                "manifests-repo",
                 "oshwa",
                 // "thingiverse",
             ]
