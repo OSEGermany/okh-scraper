@@ -77,12 +77,12 @@ impl IntermediateSettings {
             tracing::debug!("Fetcher '{fetcher_id}' has type: '{fetcher_type}' - parsing ...");
             if [
                 "none",
+                "appropedia",
                 "forgejo",
                 "github",
                 "gitlab",
-                // "thingiverse",
                 "oshwa",
-                "appropedia",
+                // "thingiverse",
             ]
             .contains(&fetcher_type)
             {
