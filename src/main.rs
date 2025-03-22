@@ -164,18 +164,18 @@ async fn main() -> Result<(), Error> {
     let workdir_lock_file_path = workdir.join("okh-scraper-workdir.lock");
     lock_file!(workdir_lock_file_path, workdir_lock_file);
 
-    let mut fetch_streams = Vec::new();
+    let mut scrape_streams = Vec::new();
     // TODO Parallelize this loop
-    tracing::info!("Setting up fetchers ...");
-    for (fetcher_id, fetcher) in run_settings.fetchers {
-        tracing::info!("- Setting up fetcher {fetcher_id} ...");
-        fetch_streams.push(fetcher.scrape().await);
+    tracing::info!("Setting up scrapers ...");
+    for (scraper_id, scraper) in run_settings.scrapers {
+        tracing::info!("- Setting up scraper {scraper_id} ...");
+        scrape_streams.push(scraper.scrape().await);
     }
 
     // stream_test::test().await;
 
-    // let fetchers = run_settings.fetchers.into_iter().map(|(fetcher_id, fetcher)| async move {fetcher.fetch_all().await});
-    let mut projects = select_all(fetch_streams);
+    // let scrapers = run_settings.scrapers.into_iter().map(|(scraper_id, scraper)| async move {scraper.scrape_all().await});
+    let mut projects = select_all(scrape_streams);
 
     // pin_mut!(projects); // needed for iteration
     while let Some(project) = projects.next().await {
@@ -188,8 +188,8 @@ async fn main() -> Result<(), Error> {
     unlock_file!(system_lock_file_path, system_lock_file);
     unlock_file!(workdir_lock_file_path, workdir_lock_file);
 
-    // fetchers::appropedia::fetch_all().await?;
-    // fetchers::oshwa::fetch_all().await?;
+    // scrapers::appropedia::scrape_all().await?;
+    // scrapers::oshwa::scrape_all().await?;
 
     // if list {
     //     let detected_vars = replacer::extract_from_file(src.as_deref())?;

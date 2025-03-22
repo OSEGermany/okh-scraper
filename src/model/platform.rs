@@ -50,7 +50,7 @@ pub enum DownloadUrlGenerationError {
 //     Err(format!("This is not a forge(-like) platform: {}", self.platform_id.as_str()))
 // _ => Err(format!("Unknown platform '{}'", self.platform_id.as_str())),
     #[error("Unknown platform: '{0}'")]
-    UnknownFetcherType(String),
+    UnknownScraperType(String),
     #[error("Missing git reference (branch, tag, commit hash, etc.)")]
     MissingRef,
 }

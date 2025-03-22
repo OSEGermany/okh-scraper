@@ -167,7 +167,7 @@ impl AccessControlConfig for ACPlatformBaseConfig {
 #[derive(Error, Debug)]
 pub enum CreationError {
     #[error("Unknown scraper type: '{0}'")]
-    UnknownFetcherType(String),
+    UnknownScraperType(String),
     #[error("Invalid config for scraper type '{0}': {1:#?}")]
     InvalidConfig(String, Option<serde_json::Error>),
 }
@@ -177,7 +177,7 @@ pub enum CreationError {
 #[derive(Error, Debug)]
 pub enum Error {
     // #[error("Unknown scraper type: '{0}'")]
-    // UnknownFetcherType(String),
+    // UnknownScraperType(String),
     // #[error("Invalid config for scraper type '{0}': {1}")]
     // InvalidConfig(String, Value),
     #[error("Failed to clone a git repo (synchronously): '{0}'")]
@@ -234,10 +234,10 @@ pub struct TypeInfo {
 
 /// Creates instances of scrapers of a specific type.
 pub trait Factory {
-    /// Info about the type of fetchers produced by this factory.
+    /// Info about the type of scrapers produced by this factory.
     fn info(&self) -> &'static TypeInfo;
 
-    /// Creates a new instance of this type of fetcher,
+    /// Creates a new instance of this type of scraper,
     /// following the supplied configuration.
     ///
     /// # Errors
@@ -332,20 +332,20 @@ pub fn create_downloader_retry_ac<T: RetryConfig + AccessControlConfig>(
     ))
 }
 
-// pub fn assemble_fetcher_factories() -> HashMap<String, impl FetcherFactory> {
-//     let fetchers = vec![oshwa::FetcherFactory, appropedia::FetcherFactory];
-//     fetchers.into_iter().map(|f| (f.name().to_string(), f)).collect()
+// pub fn assemble_scraper_factories() -> HashMap<String, impl ScraperFactory> {
+//     let scrapers = vec![oshwa::ScraperFactory, appropedia::ScraperFactory];
+//     scrapers.into_iter().map(|f| (f.name().to_string(), f)).collect()
 // }
 
 #[must_use]
 pub fn assemble_factories() -> HashMap<String, Box<dyn Factory>> {
-    let fetchers: Vec<Box<dyn Factory>> = vec![
+    let scrapers: Vec<Box<dyn Factory>> = vec![
         Box::new(oshwa::ScraperFactory),
         Box::new(appropedia::ScraperFactory),
         Box::new(manifests_repo::ScraperFactory),
         Box::new(thingiverse::ScraperFactory),
     ];
-    fetchers
+    scrapers
         .into_iter()
         .map(|f| (f.info().name.to_string(), f))
         .collect()

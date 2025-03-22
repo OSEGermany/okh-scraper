@@ -39,7 +39,7 @@ pub struct Database {
 pub struct IntermediateSettings {
     pub user_agent: String,
     pub database: Database,
-    pub fetchers: HashMap<String, HashMap<String, Value>>,
+    pub scrapers: HashMap<String, HashMap<String, Value>>,
 }
 
 #[derive(Debug)]
@@ -52,7 +52,7 @@ pub struct PartialSettings {
 pub struct Settings {
     pub user_agent: String,
     pub database: Database,
-    pub fetchers: HashMap<String, Box<dyn Scraper>>,
+    pub scrapers: HashMap<String, Box<dyn Scraper>>,
 }
 
 impl IntermediateSettings {
@@ -65,16 +65,16 @@ impl IntermediateSettings {
     }
 
     pub fn finalize(self) -> Result<Settings, SettingsError> {
-        let fetcher_factories = scrapers::assemble_factories();
-        let mut fetchers = HashMap::new();
+        let scraper_factories = scrapers::assemble_factories();
+        let mut scrapers = HashMap::new();
         let config_partial = Arc::new(self.partial());
-        for (fetcher_id, properties) in self.fetchers {
+        for (scraper_id, properties) in self.scrapers {
             let scraper_type = properties
                 .get("scraper_type")
-                .expect("fetcher section requires property 'scraper_type'")
+                .expect("scraper section requires property 'scraper_type'")
                 .as_str()
                 .expect("property 'scraper_type' needs to be a string");
-            tracing::debug!("Fetcher '{fetcher_id}' has type: '{scraper_type}' - parsing ...");
+            tracing::debug!("Scraper '{scraper_id}' has type: '{scraper_type}' - parsing ...");
             if [
                 "none",
                 "appropedia",
@@ -89,27 +89,27 @@ impl IntermediateSettings {
             {
                 // TODO HACK
                 tracing::debug!(
-                    "ignoring '{fetcher_id}' because type not yet implemented: '{scraper_type}'"
+                    "ignoring '{scraper_id}' because type not yet implemented: '{scraper_type}'"
                 );
                 continue;
             }
-            let factory = fetcher_factories
+            let factory = scraper_factories
                 .get(scraper_type)
-                .unwrap_or_else(|| panic!("No fetcher found for type '{scraper_type}'"));
-            let fetcher = factory.create(
+                .unwrap_or_else(|| panic!("No scraper found for type '{scraper_type}'"));
+            let scraper = factory.create(
                 Arc::<PartialSettings>::clone(&config_partial),
                 properties
                     .get("config")
-                    .unwrap_or_else(|| panic!("No config found for fetcher '{fetcher_id}'"))
+                    .unwrap_or_else(|| panic!("No config found for scraper '{scraper_id}'"))
                     .clone(),
             )?;
-            fetchers.insert(fetcher_id, fetcher);
+            scrapers.insert(scraper_id, scraper);
         }
 
         Ok(Settings {
             user_agent: self.user_agent,
             database: self.database,
-            fetchers,
+            scrapers,
         })
     }
 }
