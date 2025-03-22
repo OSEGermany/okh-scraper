@@ -46,7 +46,7 @@ pub type RL = governor::RateLimiter<
 >;
 
 const DEFAULT_RETRIES: u32 = 3;
-const DEFAULT_TIMEOUT: u64 = 10;
+const DEFAULT_TIMEOUT: u64 = 10000;
 
 pub static USER_AGENT_VALUE: LazyLock<header::HeaderValue> = LazyLock::new(|| {
     "okh-scraper github.com/iop-alliance/OpenKnowHow"
