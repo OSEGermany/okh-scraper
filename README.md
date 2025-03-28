@@ -39,10 +39,122 @@ and other hosting technologies. \
 The collected data conforms to the [Open Know-How (OKH)][OKH]
 and the [Open Dataset (ODS)][ODS] standards.
 
-## Usage
+## Using
+
+### How to get a Thingiverse REST API access token
+
+To be able to scrape thingiverse
+(similar to many other platforms),
+you first need to generate an API access token,
+which you then insert into this scrapers configuration,
+so it can authorize itsself with the API.
+
+**NOTE**
+Every few months, you might need to generate a new such token!
+
+How to generate one:
+
+1. create a thingiverse.com account and log in with it
+2. go to <https://www.thingiverse.com/developers/my-apps>
+3. click on the "Create an App" button
+4. choose "Web App"
+5. Fill out the form:
+    choose random values for name and description,
+    and click the "I agree ..." box)
+6. TODO Please extend these instructions!
+7. ... at some point, you will get the access token.
+    It is a 32 characters long string like this: \
+    `1234567890abcdef1234567890abcdef`
+
+In the next sections, we will see how to use it.
+Enter your access toekn into the configuration,
+replacing the string `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`.
+We will learn how to run the scraper:
+
+### Setup
+
+#### Using podman/docker
+
+```bash
+if which podman > /dev/null
+then
+  cont_app=podman
+elif which docker > /dev/null
+then
+  cont_app=docker
+else
+  >&2 echo "ERROR: Neither podman nor docker are in PATH"
+fi
+if ! which okh-scraper > /dev/null
+then
+  alias okh-scraper="$cont_app"' run --interactive --volume "$PWD:/home/okh-scraper" oseg/okh-scraper:master'
+fi
+```
+
+#### Compiling from source
+
+You need to [install Rust and Cargo],
+if you don't already have it.
+
+Then you have to get the sources, either through [git]:
+
+```shell
+git clone https://github.com/OSEGermany/okh-scraper.git
+https://github.com/OSEGermany/okh-scraper/archive/refs/heads/master.zip
+```
+
+or by downloading [the sources as a ZIP file](
+  https://github.com/OSEGermany/okh-scraper/archive/refs/heads/master.zip)
+and extracting them.
+
+After that, you change to the sources dir and compile and install:
+
+```shell
+cd okh-scraper
+cargo install --path .
+```
+
+NOTE
+To get a 64bit binary that is portable to all Linux systems,
+use
+
+```bash
+# setup (only execute this once)
+mkdir -p run
+git clone https://github.com/hoijui/rust-project-scripts.git run/rp
+run/rp/setup
+
+# building
+run/rp/build
+```
+
+### Running
+
+```bash
+mkdir okh-scraper-root
+cd okh-scraper-root
+
+cat > config.yml << EOF
+database:
+  type: file       # (opt) nothing else implemented
+  path: ./workdir  # (opt)
+
+fetchers:
+  thingiverse.com:
+    fetcher_type: thingiverse
+    config:
+      retries: 3   # (opt) fetcher specific number of retries
+      timeout: 15000  # (opt) fetcher specific request timeout in milliseconds [ms]
+      access_token: 1234567890abcdef1234567890abcdef  # (req) app access token to use the Thingiverse API
+      things_store_root: ./workdir/thingiverse_store/  # (req) Where to store the raw thingiverse API scraping results to
+      things_range_min: 2000000  # (opt)
+      things_range_max: 2999999  # (opt)
+EOF
+```
 
 1. Fill out the config file (`config.yml`)
-2. Start the scraper
+2. Start the scraper: `okh-scraper`
+3. Results will (hopefully) start trickling in under `./workdir`.
 
 It will continuously collect and update OSH project data,
 found on the supported and configured platforms and other locations.
@@ -63,14 +175,8 @@ one crawler would grase the ID range of 0 to 499'999,
 the second one from 500'000 to 999'999,
 and so on.
 
-## Building
-
 ```bash
-# To get a binary for your system
-cargo build --release
-
-# To get a 64bit binary that is portable to all Linux systems
-run/rp/build
+okh-scraper --verbose
 ```
 
 ## Testing
@@ -81,6 +187,8 @@ To run unit-, doc- and integration-tests:
 run/rp/test
 ```
 
+[install Rust and Cargo]: https://cargo-book.irust.net/en-us/getting-started/installation.html
+[git]: https://git-scm.com/
 [ODS]: https://codeberg.org/elevont/open-dataset/
 [OKH]: https://github.com/iop-alliance/OpenKnowHow/
 [OSH]: https://www.opensourcehardware.org/
