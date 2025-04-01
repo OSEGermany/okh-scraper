@@ -205,15 +205,6 @@ impl IScraper for Scraper {
         )
         .await;
 
-        // let mut store = match store_res {
-        //     Err(err) => return stream! {
-        //         yield Err(err.into())
-        //     }
-        //     .boxed(),
-        //     Ok(store) => {
-        //         store
-        //     }
-        // };
         let mut store = ok_or_return_err_stream!(store_res);
 
         tracing::info!("Fetching {} - total ...", self.info().name);
@@ -333,15 +324,7 @@ impl Scraper {
     ) -> Result<String, Error> {
         let rate_limiter = Arc::<_>::clone(&RATE_LIMITER);
         rate_limiter.until_ready().await;
-        Ok(client
-            // .lock()
-            // .unwrap()
-            .get(url)
-            .query(&params)
-            .send()
-            .await?
-            .text()
-            .await?)
+        Ok(client.get(url).query(&params).send().await?.text().await?)
     }
 
     fn parse_api_response_as_json(content: &str) -> Result<Value, serde_json::Error> {
@@ -349,7 +332,7 @@ impl Scraper {
         if let Err(err) = &res_json_cont {
             tracing::warn!("Failed to parse Thingiverse API response as JSON:\n{err}");
         }
-        res_json_cont //.map_err(|err| err.into())
+        res_json_cont
     }
 
     // #[instrument]
@@ -379,9 +362,7 @@ impl Scraper {
                     "Failed to parse Thingiverse API response (JSON), \
 both as the expected type and as an error response:\n{serde_err}\n{err_err}"
                 );
-                // tracing::warn!("... raw, (assumed JSON) value:\n{content}");
                 Ok(ParsedApiResponse::Json(serde_err))
-                // err_err.into()
             }
             Ok(parsed) => Ok(ParsedApiResponse::Success(parsed)),
         }
@@ -394,15 +375,6 @@ both as the expected type and as an error response:\n{serde_err}\n{err_err}"
         let params = [("type", "things"), ("per_page", "1"), ("sort", "newest")];
         let res_raw_text =
             Self::fetch_as_text(client, "https://api.thingiverse.com/search/", &params).await?;
-        // let res_raw_text = client
-        //     // .lock()
-        //     // .unwrap()
-        //     .get("https://api.thingiverse.com/search/")
-        //     .query(&params)
-        //     .send()
-        //     .await?
-        //     .text()
-        //     .await?;
 
         Self::parse_api_response::<SearchSuccess>(&res_raw_text).map(
             |parsed_response|
@@ -413,21 +385,11 @@ both as the expected type and as an error response:\n{serde_err}\n{err_err}"
     }
 
     // #[instrument]
-    // async fn fetch_thing(&self, thing_id: ThingId) -> Result<(String, Thing), Error> {
     async fn fetch_thing(
         client: Arc<ClientWithMiddleware>,
         thing_id: ThingId,
     ) -> Result<(String, ParsedApiResponse<Thing>), Error> {
         tracing::info!("Fetching thing {thing_id} ...");
-        // let client = Arc::<_>::clone(&self.downloader);
-        // let res_raw_text = client
-        //     // .lock()
-        //     // .unwrap()
-        //     .get(&format!("https://api.thingiverse.com/things/{thing_id}"))
-        //     .send()
-        //     .await?
-        //     .text()
-        //     .await?;
         let params: [(&str, &str); 0] = [];
         let res_raw_text = Self::fetch_as_text(
             client,
