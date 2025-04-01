@@ -2,10 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use super::{
-    thingiverse_store::ThingId, ACPlatformBaseConfig, CreationError, Error,
-    Factory as IScraperFactory, Scraper as IScraper, TypeInfo,
-};
+use super::{super::Error, store::ThingId};
 use crate::{
     model::{
         hosting_provider_id::HostingProviderId,

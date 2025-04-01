@@ -35,8 +35,6 @@ pub mod appropedia;
 pub mod manifests_repo;
 pub mod oshwa;
 pub mod thingiverse;
-pub mod thingiverse_model;
-pub mod thingiverse_store;
 
 pub type RL = governor::RateLimiter<
     governor::state::NotKeyed,

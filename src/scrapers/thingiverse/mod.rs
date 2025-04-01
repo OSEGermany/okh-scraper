@@ -3,11 +3,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use super::create_downloader_retry_ac;
-use super::thingiverse_model::{SearchSuccess, TvApiError};
-use super::thingiverse_store::ThingStoreSlice;
+use super::thingiverse::model::{SearchSuccess, TvApiError};
+use super::thingiverse::store::ThingStoreSlice;
 use super::{
-    thingiverse_store::ThingId, ACPlatformBaseConfig, CreationError, Error as SuperError,
-    Factory as IScraperFactory, Scraper as IScraper, TypeInfo,
+    thingiverse::store::ThingId, CreationError, Error as SuperError, Factory as IScraperFactory,
+    Scraper as IScraper, TypeInfo,
 };
 use crate::scrapers::ok_or_return_err_stream;
 use crate::{
@@ -18,8 +18,8 @@ use crate::{
         project::Project,
     },
     scrapers::{
-        thingiverse_model::Thing,
-        thingiverse_store::{ThingMeta, ThingState, ThingStore},
+        thingiverse::model::Thing,
+        thingiverse::store::{ThingMeta, ThingState, ThingStore},
     },
     settings::PartialSettings,
     structured_content::{Chunk, RawContent, SerializationFormat},
@@ -41,6 +41,9 @@ use std::{borrow::Cow, fmt::Display, rc::Rc, sync::Arc};
 use thiserror::Error;
 use tokio::time::Duration;
 use tracing::instrument;
+
+pub mod model;
+pub mod store;
 
 pub const HOSTING_PROVIDER_ID: HostingProviderId = HostingProviderId::ThingiverseCom;
 
