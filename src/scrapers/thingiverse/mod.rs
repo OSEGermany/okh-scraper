@@ -198,7 +198,7 @@ impl IScraper for Scraper {
             latest_thing_id,
             self.config.things_range_max.unwrap_or(ThingId::MAX),
         );
-        tracing::debug!("Fetching things between thing-IDs (including): {thing_id_range_min} - {thing_id_range_max}");
+        tracing::debug!("Scraping things between thing-IDs (including): {thing_id_range_min} - {thing_id_range_max}");
 
         tracing::info!("Preparing disc store ...");
 
@@ -213,7 +213,7 @@ impl IScraper for Scraper {
 
         let client = Arc::<_>::clone(&self.downloader);
 
-        tracing::info!("Fetching {} - total ...", self.info().name);
+        tracing::info!("Scraping {} ...", self.info().name);
         stream! {
             'main: loop {
                 let mut store_slice = store.get_next_slice().await?;
@@ -225,7 +225,7 @@ impl IScraper for Scraper {
                     match res {
                         Err(err) => yield Err(err.into()),
                         Ok(Some(project)) => yield Ok(project),
-                        Ok(None) => (),
+                        Ok(None) => tracing::info!("thing {thing_id} - is proprietary"),
                     }
                     if abort {
                         tracing::error!("Aborting the scraping process!");
@@ -483,7 +483,7 @@ both as the expected type and as an error response:\n{serde_err}\n{err_err}"
         client: Arc<ClientWithMiddleware>,
         thing_id: ThingId,
     ) -> Result<(String, ParsedApiResponse<Thing>), Error> {
-        tracing::info!("Fetching thing {thing_id} ...");
+        tracing::info!("thing {thing_id} - fetching...");
         let params: [(&str, &str); 0] = [];
         let res_raw_text = Self::fetch_as_text(
             client,
