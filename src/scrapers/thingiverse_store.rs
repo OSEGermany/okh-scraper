@@ -338,6 +338,11 @@ must be >= range_min ({range_min})"
         self.meta.get(&state).unwrap().front()
     }
 
+    #[must_use]
+    pub fn next_id(&self, state: ThingState) -> Option<ThingId> {
+        self.next(state).map(|meta| meta.id)
+    }
+
     /// Returns the number of thing IDs covered by this slices.
     #[must_use]
     pub const fn size(&self) -> ThingId {
