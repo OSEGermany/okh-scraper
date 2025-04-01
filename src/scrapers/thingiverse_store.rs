@@ -46,7 +46,7 @@ pub const LAST_SCRAPE_FILE_NAME: &str = "last_scrape.csv";
 pub type ThingId = u32;
 
 const fn earliest() -> DateTime<Utc> {
-    // TODO Maybe this would be more performant if wed make a Lazy constant and cloned it.
+    // TODO Maybe this would be more performant if we'd make a Lazy constant and cloned it.
     DateTime::from_timestamp_nanos(0)
 }
 
