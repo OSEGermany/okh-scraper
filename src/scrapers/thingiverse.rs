@@ -4,8 +4,9 @@
 
 use super::create_downloader_retry_ac;
 use super::thingiverse_model::{SearchSuccess, TvApiError};
+use super::thingiverse_store::ThingStoreSlice;
 use super::{
-    thingiverse_store::ThingId, ACPlatformBaseConfig, CreationError, Error,
+    thingiverse_store::ThingId, ACPlatformBaseConfig, CreationError, Error as SuperError,
     Factory as IScraperFactory, Scraper as IScraper, TypeInfo,
 };
 use crate::scrapers::ok_or_return_err_stream;
@@ -30,13 +31,14 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use fs4::async_std::AsyncFileExt;
 use futures::{stream::BoxStream, stream::StreamExt};
-use governor::{Quota, RateLimiter};
+use governor::{state, Quota, RateLimiter};
 use reqwest::header::HeaderMap;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::LazyLock;
 use std::{borrow::Cow, fmt::Display, rc::Rc, sync::Arc};
+use thiserror::Error;
 use tokio::time::Duration;
 use tracing::instrument;
 
@@ -173,17 +175,16 @@ impl IScraper for Scraper {
         &SCRAPER_TYPE
     }
 
-    async fn scrape(&self) -> BoxStream<'static, Result<Project, Error>> {
-        let client = Arc::<_>::clone(&self.downloader);
-
-        let latest_thing_id = match Self::fetch_latest_thing_id(Arc::<_>::clone(&client)).await {
-            Err(err) => {
-                tracing::error!("Failed to fetch latest thing-ID: {err}");
-                ok_or_return_err_stream!(Err(err));
-                ThingId::MAX
-            }
-            Ok(thing_id) => thing_id,
-        };
+    async fn scrape(&self) -> BoxStream<'static, Result<Project, SuperError>> {
+        let latest_thing_id =
+            match Self::fetch_latest_thing_id(Arc::<_>::clone(&self.downloader)).await {
+                Err(err) => {
+                    tracing::error!("Failed to fetch latest thing-ID: {err}");
+                    ok_or_return_err_stream!(Err(err));
+                    ThingId::MAX
+                }
+                Ok(thing_id) => thing_id,
+            };
         tracing::debug!("Latest thing-ID: {latest_thing_id}");
 
         let thing_id_range_min = std::cmp::max(
@@ -207,74 +208,25 @@ impl IScraper for Scraper {
 
         let mut store = ok_or_return_err_stream!(store_res);
 
+        let client = Arc::<_>::clone(&self.downloader);
+
         tracing::info!("Fetching {} - total ...", self.info().name);
         stream! {
-            loop {
+            'main: loop {
                 let mut store_slice = store.get_next_slice().await?;
                 let mut store_slice = store_slice.write().await;
                 let previously_os_things = store_slice.cloned_os(); // TODO Once we have an initial scrape, we should implement scraping these again, after this loop that scraped the yet untried
-                while let Some(thing_meta) = store_slice.next(ThingState::Untried) {
-                    let thing_id = thing_meta.get_id();
-                    // We want this time to be as close as possible to the fetch,
-                    // but rather before then after it.
-                    let fetch_time = Utc::now();
-                    let (state, raw_api_response) = match Self::fetch_thing(Arc::<_>::clone(&client), thing_id).await {
-                    // let (state, raw_api_response) = match Ok::<(String, &str), Error>(("".to_string(), "")) {
-                        Err(err) => {
-                            tracing::error!("Failed to fetch thing-ID {thing_id} (low-level/network-issue): {err}");
-                            (ThingState::FailedToFetch, None)
-                        },
-                        Ok((raw_api_response, parsed_api_response)) => {
-                            match parsed_api_response.into_result() {
-                                Ok(parsed_as_thing) => {
-                                    let is_os = parsed_as_thing.is_open_source();
-                                    if is_os {
-                                        (ThingState::OpenSource, Some(raw_api_response))
-                                    } else {
-                                        (ThingState::Proprietary, None)
-                                    }
-                                },
-                                Err(Error::DeserializeFailed(err) | Error::DeserializeAsJsonFailed(err)) => {
-                                    (ThingState::FailedToParse, Some(raw_api_response))
-                                },
-                                Err(Error::ProjectDoesNotExist | Error::ProjectDoesNotExistId(_)) => {
-                                    tracing::info!("Thing {thing_id} does not exist");
-                                    (ThingState::DoesNotExist, None)
-                                },
-                                Err(Error::ProjectNotPublic) => {
-                                    tracing::info!("Thing {thing_id} is \"under moderation\" -> most likely flagged as copyright infringing");
-                                    (ThingState::Banned, None)
-                                },
-                                Err(Error::HostingApiMsg(err_msg)) => {
-                                    tracing::error!("Failed to fetch thing-ID {thing_id} (API returned error): {err_msg}");
-                                    (ThingState::FailedToFetch, None)
-                                },
-                                Err(Error::RateLimitReached) => {
-                                    tracing::error!("Reached Thingiverse rate limit; Aborting the scraping process!");
-                                    yield Err(Error::RateLimitReached);
-                                    break;
-                                },
-                                Err(err) => {
-                                    yield Err(err);
-                                    continue;
-                                },
-                            }
-                        }
-                    };
-                    let thing_meta = ThingMeta::new(thing_id, state, fetch_time);
-                    if let Err(err) = store_slice.insert(thing_meta, raw_api_response.clone()).await{
-                        yield Err(err.into());
-                        continue;
+                'slice: while let Some(thing_id) = store_slice.next_id(ThingState::Untried) {
+                    let res = Self::scrape_one(Arc::<_>::clone(&client), &mut store, &mut store_slice, thing_id).await;
+                    let abort = if let Err(err) = &res { err.aborts() } else { false };
+                    match res {
+                        Err(err) => yield Err(err.into()),
+                        Ok(Some(project)) => yield Ok(project),
+                        Ok(None) => (),
                     }
-                    store.set_last_scrape(fetch_time);
-                    if let Some(raw_api_response_val) = raw_api_response {
-                        let mut project = Project::new(HostingUnitId::WebById(HostingUnitIdWebById::from_parts(
-                            HOSTING_PROVIDER_ID,
-                            thing_id.to_string())
-                        ));
-                        // project.crawling_meta_tree = todo!(); // TODO FIXME Set scraping meta-data!
-                        project.raw = Some(Chunk::from_content(SerializationFormat::Json, RawContent::String(raw_api_response_val)));
-                        yield Ok(project);
+                    if abort {
+                        tracing::error!("Aborting the scraping process!");
+                        break 'main;
                     }
                 }
             }
@@ -282,9 +234,148 @@ impl IScraper for Scraper {
     }
 }
 
+/// Thrown when a [`Scraper`] failed to scrape in general,
+/// or while trying to scrape a single or a batch of projects.
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("Some I/O problem: '{0}'")]
+    IOError(#[from] std::io::Error),
+    #[error(
+        "Reached (and surpassed) the Thingiverse API rate-limit; Aborting the scraping process!"
+    )]
+    RateLimitReached,
+    #[error("Network/Internet download failed: '{0}'")]
+    DownloadError(#[from] reqwest::Error),
+    #[error("Network/Internet download failed: '{0}'")]
+    DownloadMiddlewareError(#[from] reqwest_middleware::Error),
+    #[error("Failed to deserialize a fetched result to JSON: {0}")]
+    DeserializeAsJsonFailed(#[from] serde_json::Error),
+    #[error(
+        "Failed to deserialize a fetched JSON result to our Rust model of the expected type: {0}"
+    )]
+    DeserializeFailed(serde_json::Error),
+    #[error("Thing with ID {0} failed to fetch; API returned error: {1}")]
+    HostingApiMsg(ThingId, String),
+    #[error(
+        "Thing with ID {0} is \"under moderation\" -> most likely flagged as copyright infringing"
+    )]
+    ProjectNotPublic(ThingId),
+    #[error("Thing with ID {0} does not exist")]
+    ProjectDoesNotExist(ThingId),
+}
+
+impl From<Error> for SuperError {
+    fn from(other: Error) -> Self {
+        match other {
+            Error::DeserializeFailed(err) => Self::DeserializeFailed(err),
+            Error::DeserializeAsJsonFailed(err) => Self::DeserializeAsJsonFailed(err),
+            Error::HostingApiMsg(thing_id, msg) => {
+                Self::HostingApiMsg(format!("Thing ID {thing_id} - {msg}"))
+            }
+            Error::ProjectNotPublic(_) => Self::ProjectNotPublic,
+            Error::ProjectDoesNotExist(_) => Self::ProjectDoesNotExist,
+            Error::IOError(err) => Self::IOError(err),
+            Error::RateLimitReached => Self::RateLimitReached,
+            Error::DownloadError(err) => Self::DownloadError(err),
+            Error::DownloadMiddlewareError(err) => Self::DownloadMiddlewareError(err),
+        }
+    }
+}
+
+impl Error {
+    pub fn as_thing_state(
+        &self,
+        thing_id: ThingId,
+        raw_api_response: String,
+    ) -> Option<(ThingState, Option<String>)> {
+        Some(match self {
+            Self::DeserializeFailed(err) | Self::DeserializeAsJsonFailed(err) => {
+                (ThingState::FailedToParse, Some(raw_api_response))
+            }
+            Self::HostingApiMsg(_, _) => (ThingState::FailedToFetch, None),
+            Self::ProjectNotPublic(_) => (ThingState::Banned, None),
+            Self::ProjectDoesNotExist(_) => (ThingState::DoesNotExist, None),
+            Self::IOError(_)
+            | Self::RateLimitReached
+            | Self::DownloadError(_)
+            | Self::DownloadMiddlewareError(_) => {
+                return None;
+            }
+        })
+    }
+
+    pub fn aborts(&self) -> bool {
+        match self {
+            Self::DeserializeFailed(_)
+            | Self::DeserializeAsJsonFailed(_)
+            | Self::HostingApiMsg(_, _)
+            | Self::ProjectNotPublic(_)
+            | Self::ProjectDoesNotExist(_) => false,
+            Self::IOError(_)
+            | Self::RateLimitReached
+            | Self::DownloadError(_)
+            | Self::DownloadMiddlewareError(_) => true,
+        }
+    }
+}
+
+impl Scraper {
+    async fn fetch_thing_wrapper(
+        client: Arc<ClientWithMiddleware>,
+        thing_id: ThingId,
+    ) -> Result<(ThingState, Option<String>), Error> {
+        let (raw_api_response, parsed_api_response) =
+            Self::fetch_thing(Arc::<_>::clone(&client), thing_id).await?;
+        match parsed_api_response.into_result() {
+            Ok(parsed_as_thing) => {
+                let is_os = parsed_as_thing.is_open_source();
+                if is_os {
+                    Ok((ThingState::OpenSource, Some(raw_api_response)))
+                } else {
+                    Ok((ThingState::Proprietary, None))
+                }
+            }
+            Err(err) => match err.as_thing_state(thing_id, raw_api_response) {
+                Some(state) => Ok(state),
+                None => Err(err),
+            },
+        }
+    }
+
+    async fn scrape_one(
+        client: Arc<ClientWithMiddleware>,
+        store: &mut ThingStore,
+        store_slice: &mut ThingStoreSlice,
+        thing_id: ThingId,
+    ) -> Result<Option<Project>, Error> {
+        // We want this time to be as close as possible to the fetch,
+        // but rather before then after it.
+        let fetch_time = Utc::now();
+        let (state, raw_api_response) = Self::fetch_thing_wrapper(client, thing_id).await?;
+        let thing_meta = ThingMeta::new(thing_id, state, fetch_time);
+        store_slice
+            .insert(thing_meta, raw_api_response.clone())
+            .await?;
+        store.set_last_scrape(fetch_time);
+        Ok(if let Some(raw_api_response_val) = raw_api_response {
+            let mut project = Project::new(HostingUnitId::WebById(
+                HostingUnitIdWebById::from_parts(HOSTING_PROVIDER_ID, thing_id.to_string()),
+            ));
+            // project.crawling_meta_tree = todo!(); // TODO FIXME Set scraping meta-data!
+            project.raw = Some(Chunk::from_content(
+                SerializationFormat::Json,
+                RawContent::String(raw_api_response_val),
+            ));
+            Some(project)
+        } else {
+            None
+        })
+    }
+}
+
 enum ParsedApiResponse<T: serde::de::DeserializeOwned> {
     Success(T),
-    Error(TvApiError),
+    Error(ThingId, TvApiError),
     Json(serde_json::Error),
     Text(serde_json::Error),
     RateLimitReached,
@@ -297,7 +388,7 @@ impl<T: serde::de::DeserializeOwned> ParsedApiResponse<T> {
     ) -> ParsedApiResponse<NT> {
         match self {
             Self::Success(success) => ParsedApiResponse::Success(success_mapper(success)),
-            Self::Error(err) => ParsedApiResponse::Error(err),
+            Self::Error(thing_id, err) => ParsedApiResponse::Error(thing_id, err),
             Self::Json(json) => ParsedApiResponse::Json(json),
             Self::Text(err) => ParsedApiResponse::Text(err),
             Self::RateLimitReached => ParsedApiResponse::RateLimitReached,
@@ -307,7 +398,7 @@ impl<T: serde::de::DeserializeOwned> ParsedApiResponse<T> {
     fn into_result(self) -> Result<T, Error> {
         match self {
             Self::Success(success) => Ok(success),
-            Self::Error(api_err) => Err(api_err.into()),
+            Self::Error(thing_id, api_err) => Err(Error::HostingApiMsg(thing_id, api_err.error)),
             Self::Json(err) => Err(Error::DeserializeFailed(err)),
             Self::Text(err) => Err(Error::DeserializeAsJsonFailed(err)),
             Self::RateLimitReached => Err(Error::RateLimitReached),
@@ -337,23 +428,24 @@ impl Scraper {
 
     // #[instrument]
     fn parse_api_response<T: serde::de::DeserializeOwned>(
+        thing_id: ThingId,
         content: &str,
-    ) -> Result<ParsedApiResponse<T>, Error> {
+    ) -> ParsedApiResponse<T> {
         let json_val = match Self::parse_api_response_as_json(content) {
             Ok(json_val) => json_val,
             Err(serde_err) => {
                 // if content == "You can only send 300 requests per 5 minutes. Please check https://www.thingiverse.com/developers/getting-started" {
-                return Ok(if content.starts_with("You can only send ") {
+                return if content.starts_with("You can only send ") {
                     ParsedApiResponse::RateLimitReached
                 } else {
                     ParsedApiResponse::Text(serde_err)
-                });
+                };
             }
         };
 
         let err_err = match serde_json::from_value::<TvApiError>(json_val.clone()) {
             Err(err) => err,
-            Ok(api_error_cont) => return Ok(ParsedApiResponse::Error(api_error_cont)),
+            Ok(api_error_cont) => return ParsedApiResponse::Error(thing_id, api_error_cont),
         };
 
         match serde_json::from_value::<T>(json_val) {
@@ -362,9 +454,9 @@ impl Scraper {
                     "Failed to parse Thingiverse API response (JSON), \
 both as the expected type and as an error response:\n{serde_err}\n{err_err}"
                 );
-                Ok(ParsedApiResponse::Json(serde_err))
+                ParsedApiResponse::Json(serde_err)
             }
-            Ok(parsed) => Ok(ParsedApiResponse::Success(parsed)),
+            Ok(parsed) => ParsedApiResponse::Success(parsed),
         }
     }
 
@@ -376,12 +468,11 @@ both as the expected type and as an error response:\n{serde_err}\n{err_err}"
         let res_raw_text =
             Self::fetch_as_text(client, "https://api.thingiverse.com/search/", &params).await?;
 
-        Self::parse_api_response::<SearchSuccess>(&res_raw_text).map(
-            |parsed_response|
-                parsed_response.map(|success|
+        Self::parse_api_response::<SearchSuccess>(ThingId::MAX, &res_raw_text)
+                .map(|success|
                     success.hits.first().expect(
                         "No hits returned when fetching latest thing from thingiverse.com - this should never happen"
-                    ).id))?.into_result()
+                    ).id).into_result()
     }
 
     // #[instrument]
@@ -398,6 +489,7 @@ both as the expected type and as an error response:\n{serde_err}\n{err_err}"
         )
         .await?;
 
-        Self::parse_api_response::<Thing>(&res_raw_text).map(|thing| (res_raw_text, thing))
+        Ok(Self::parse_api_response::<Thing>(thing_id, &res_raw_text))
+            .map(|thing| (res_raw_text, thing))
     }
 }
