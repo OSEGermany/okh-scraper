@@ -368,23 +368,39 @@ impl Scraper {
         offset: usize,
     ) -> Result<Projects, Error> {
         let params = [("limit", batch_size), ("offset", offset)];
-        let res_projects_raw_json = client
+        let raw_text = client
             .get("https://certificationapi.oshwa.org/api/projects")
             .query(&params)
             .send()
             .await?
-            .json::<Value>()
+            .text()
             .await?;
 
-        serde_json::from_value::<Projects>(res_projects_raw_json.clone()).map_err(|_err| {
-            tracing::debug!(
-                "Trying to parse OSHWA (supposed) error JSON return:\n{res_projects_raw_json}"
-            );
-            let res_api_error_cont = serde_json::from_value::<ErrorCont>(res_projects_raw_json);
-            match res_api_error_cont {
-                Err(deserialize_err) => deserialize_err.into(),
-                Ok(api_error_cont) => api_error_cont.error.into(),
+        let res_raw_json = serde_json::from_str::<Value>(&raw_text);
+        let json_val = match res_raw_json {
+            Ok(json_val) => json_val,
+            Err(serde_err) => {
+                tracing::warn!("Failed to parse OSHWA API response as JSON:\n{serde_err}");
+                return Err(Error::DeserializeAsJsonFailed(serde_err, raw_text));
             }
-        })
+        };
+
+        let err_err = match serde_json::from_value::<ErrorCont>(json_val.clone()) {
+            Err(err) => err,
+            Ok(api_error_cont) => {
+                return Err(Error::HostingApiMsg(api_error_cont.error.to_string()))
+            }
+        };
+
+        match serde_json::from_value::<Projects>(json_val) {
+            Err(serde_err) => {
+                tracing::warn!(
+                    "Failed to parse OSHWA API response (JSON), \
+both as the expected type and as an error response:\n{serde_err}\n{err_err}"
+                );
+                Err(Error::DeserializeFailed(serde_err, raw_text))
+            }
+            Ok(parsed) => Ok(parsed),
+        }
     }
 }

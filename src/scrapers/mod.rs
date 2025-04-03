@@ -197,11 +197,11 @@ pub enum Error {
     #[error("{0} reached (and very likely surpassed) a total number of projects that is higher than the max fetch-limit set in its API ({1}); please inform the {0} admins!")]
     FetchLimitReached(HostingProviderId, usize),
     #[error("Failed to deserialize a fetched result to JSON: {0}")]
-    DeserializeAsJsonFailed(#[from] serde_json::Error),
+    DeserializeAsJsonFailed(#[source] serde_json::Error, String),
     #[error(
         "Failed to deserialize a fetched JSON result to our Rust model of the expected type: {0}"
     )]
-    DeserializeFailed(serde_json::Error),
+    DeserializeFailed(#[source] serde_json::Error, String),
     #[error("OSHWA API returned error content: {0}")]
     OshwaApiError(#[from] oshwa::ApiError), // TODO Really, we should not have such scraper-specific errors here
     #[error("Hosting technology (e.g. platform) API returned error: {0}")]
@@ -211,11 +211,40 @@ pub enum Error {
     #[error("Project that was tired to scrape does not exist")]
     ProjectDoesNotExist,
     #[error("Project that was tired to scrape does not exist: {0}")]
+    ProjectNotOpenSource(HostingUnitId),
+    #[error("Project that was tired to scrape is not Open Source: {0}")]
     ProjectDoesNotExistId(HostingUnitId),
     #[error("Failed to parse a hosting URL to a hosting-unit-id: {0}")]
     HostingUnitIdParseError(#[from] hosting_unit_id::ParseError),
     #[error("Failed pull git repo (asynchronously): {0}")]
     GitAsyncPullError(#[from] crossbeam_channel::RecvError),
+}
+
+impl Error {
+    #[must_use]
+    pub const fn aborts(&self) -> bool {
+        match self {
+            Self::IOError(_) | Self::RateLimitReached => true,
+            Self::FailedGitClone(_)
+            | Self::RateLimitReached
+            | Self::FailedGitFetch(_)
+            | Self::FailedGit(_)
+            | Self::FindError(_)
+            | Self::DownloadError(_)
+            | Self::DownloadMiddlewareError(_)
+            | Self::FetchLimitReached(_, _)
+            | Self::DeserializeAsJsonFailed(_, _)
+            | Self::DeserializeFailed(_, _)
+            | Self::OshwaApiError(_)
+            | Self::HostingApiMsg(_)
+            | Self::ProjectNotPublic
+            | Self::ProjectNotOpenSource(_)
+            | Self::ProjectDoesNotExist
+            | Self::ProjectDoesNotExistId(_)
+            | Self::HostingUnitIdParseError(_)
+            | Self::GitAsyncPullError(_) => false,
+        }
+    }
 }
 
 /// Contains descriptive data about the type of a scraper.

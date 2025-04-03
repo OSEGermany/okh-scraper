@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use super::{super::Error, store::ThingId};
+use super::{store::ThingId, Error};
 use crate::{
     model::{
         hosting_provider_id::HostingProviderId,
@@ -140,21 +140,17 @@ impl TvApiError {
                 id_str.parse().ok()
             })
     }
-}
 
-impl From<TvApiError> for Error {
-    fn from(other: TvApiError) -> Self {
-        if other.is_thing_has_not_been_published() {
-            Self::ProjectDoesNotExist
-        } else if other.is_thing_is_under_moderation() || other.is_thing_is_private() {
-            Self::ProjectNotPublic
-        } else if let Some(thing_id) = other.get_thing_id_if_not_exists() {
-            Self::ProjectDoesNotExistId(HostingUnitId::WebById(HostingUnitIdWebById::from_parts(
-                HostingProviderId::ThingiverseCom,
-                thing_id.to_string(),
-            )))
+    #[must_use]
+    pub fn into_local_error(self, thing_id: ThingId) -> Error {
+        if self.is_thing_has_not_been_published() {
+            Error::ProjectDoesNotExist(thing_id)
+        } else if self.is_thing_is_under_moderation() || self.is_thing_is_private() {
+            Error::ProjectNotPublic(thing_id)
+        } else if let Some(thing_id) = self.get_thing_id_if_not_exists() {
+            Error::ProjectDoesNotExist(thing_id)
         } else {
-            Self::HostingApiMsg(other.error)
+            Error::HostingApiMsg(thing_id, self.error)
         }
     }
 }
@@ -416,6 +412,11 @@ impl Thing {
         mapped_license_opt
             .and_then(|license_id| license_id.spdx)
             .map(std::borrow::ToOwned::to_owned)
+    }
+
+    #[must_use]
+    pub fn to_hosting_unit_id(&self) -> HostingUnitId {
+        (super::HOSTING_PROVIDER_ID, self.id.to_string()).into()
     }
 }
 
