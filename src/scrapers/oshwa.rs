@@ -353,15 +353,6 @@ impl OshwaLicense {
     }
 }
 
-// impl Projects {
-//     pub fn check_limit(&self) -> BoxResult<()> {
-//         if self.query.category_members.len() == self.limits.category_members {
-//             return Err(format!("Appropedia reached (and very likely surpassed) a total number of projects that is higher than the max fetch limit set in its API ({}); please inform the appropedia.org admins!", self.limits.category_members).into());
-//         }
-//         Ok(())
-//     }
-// }
-
 impl From<Projects> for Vec<String> {
     fn from(value: Projects) -> Self {
         value.items.iter().map(|p| p.oshwa_uid.clone()).collect()
