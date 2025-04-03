@@ -2,12 +2,12 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use cli_utils::{BoxError, BoxResult};
-use serde::{de::DeserializeOwned, Serialize};
-use std::{
+use async_std::{
     fs,
     path::{Path, PathBuf},
 };
+use cli_utils::{BoxError, BoxResult};
+use serde::{de::DeserializeOwned, Serialize};
 
 /// Type of structure of data.
 #[derive(Debug, Clone, Copy)]
@@ -59,8 +59,8 @@ impl TryFrom<&Path> for SerializationFormat {
 
 #[derive(Debug)]
 pub enum RawContent {
-    String(String),
     Bytes(Vec<u8>),
+    String(String),
 }
 
 impl RawContent {
