@@ -402,7 +402,8 @@ we require the content of the thing, put it was not provided",
         self.content_dir.as_path()
     }
 
-    fn content_file_path(&self, thing_id: ThingId, temp: bool) -> PathBuf {
+    #[must_use]
+    pub fn content_file_path(&self, thing_id: ThingId, temp: bool) -> PathBuf {
         construct_file_path(self.content_dir_path(), format!("{thing_id}.json"), temp)
     }
 
@@ -605,7 +606,7 @@ can not be smaller then ({MIN_SLICE_SIZE})"
     }
 
     // NOTE If we make this `const`, building on CI will fail
-    pub fn set_last_scrape(&mut self, time: DateTime<Utc>) {
+    pub const fn set_last_scrape(&mut self, time: DateTime<Utc>) {
         self.last_scrape = time;
     }
 }

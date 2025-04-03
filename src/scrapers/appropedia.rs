@@ -197,7 +197,7 @@ struct Projects {
 }
 
 impl Projects {
-    pub fn check_limit(&self, hosting_provider: HostingProviderId) -> Result<(), Error> {
+    pub const fn check_limit(&self, hosting_provider: HostingProviderId) -> Result<(), Error> {
         if self.query.category_members.len() == self.limits.category_members {
             return Err(Error::FetchLimitReached(
                 hosting_provider,
