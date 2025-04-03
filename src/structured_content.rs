@@ -121,6 +121,16 @@ impl<P: Serialize + DeserializeOwned> Chunk<P> {
     }
 
     #[must_use]
+    pub const fn from_type_and_file(format: SerializationFormat, file: PathBuf) -> Self {
+        Self {
+            format,
+            content: None,
+            file: Some(file),
+            parsed: None,
+        }
+    }
+
+    #[must_use]
     pub const fn from_content(format: SerializationFormat, content: RawContent) -> Self {
         Self {
             format,
