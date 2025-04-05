@@ -60,16 +60,21 @@ How to generate one:
 4. choose "Web App"
 5. Fill out the form:
     choose random values for name and description,
-    and click the "I agree ..." box)
-6. TODO Please extend these instructions!
-7. ... at some point, you will get the access token.
+    click the "I agree to the MakerBot API terms and Privacy Policy" box,
+    and click on the button "CREATE & GET APP KEY"
+    on the top of the page, next to "CANCEL".
+6. If all went well, your "APP" will have been created,
+    and you will be presented with its details.
+    We are interested in the **App Token** value.
     It is a 32 characters long string like this: \
-    `1234567890abcdef1234567890abcdef`
+    `1234567890abcdef1234567890abcdef` \
+    copy it!
 
 In the next sections, we will see how to use it.
-Enter your access toekn into the configuration,
+Enter your access token into the configuration,
 replacing the string `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`.
-We will learn how to run the scraper:
+
+We will now learn how to run the scraper:
 
 ### Setup
 
@@ -135,17 +140,19 @@ mkdir okh-scraper-root
 cd okh-scraper-root
 
 cat > config.yml << EOF
+user_agent: "new-projects-fetcherfetcher"
+
 database:
   type: file       # (opt) nothing else implemented
   path: ./workdir  # (opt)
 
-fetchers:
+scrapers:
   thingiverse.com:
-    fetcher_type: thingiverse
+    scraper_type: thingiverse
     config:
-      retries: 3   # (opt) fetcher specific number of retries
-      timeout: 15000  # (opt) fetcher specific request timeout in milliseconds [ms]
-      access_token: 1234567890abcdef1234567890abcdef  # (req) app access token to use the Thingiverse API
+      retries: 3   # (opt) scraper specific number of retries
+      timeout: 15000  # (opt) scraper specific request timeout in milliseconds [ms]
+      access_token: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX  # (req) app access token to use the Thingiverse API
       things_store_root: ./workdir/thingiverse_store/  # (req) Where to store the raw thingiverse API scraping results to
       things_range_min: 2000000  # (opt)
       things_range_max: 2999999  # (opt)
@@ -153,8 +160,11 @@ EOF
 ```
 
 1. Fill out the config file (`config.yml`)
-2. Start the scraper: `okh-scraper`
-3. Results will (hopefully) start trickling in under `./workdir`.
+2. Make sure that the dir specified in the configuration under `database:path` exists,
+    in our case:
+    `mkdir ./workdir`
+3. Start the scraper: `okh-scraper`
+4. Results will (hopefully) start trickling in under `./workdir`.
 
 It will continuously collect and update OSH project data,
 found on the supported and configured platforms and other locations.
