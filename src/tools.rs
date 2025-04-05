@@ -9,12 +9,6 @@ use reqwest::header::HeaderValue;
 use urlencoding::encode;
 // use url::form_urlencoded;
 
-pub static USER_AGENT_VALUE: LazyLock<HeaderValue> = LazyLock::new(|| {
-    "okh-scraper github.com/iop-alliance/OpenKnowHow"
-        .parse()
-        .unwrap()
-});
-
 pub type SpdxLicenseExpression = Cow<'static, str>;
 
 pub const LICENSE_UNKNOWN: SpdxLicenseExpression = Cow::Borrowed("LicenseRef-NOASSERTION");

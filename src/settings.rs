@@ -15,6 +15,8 @@ use std::{collections::HashMap, path::PathBuf, rc::Rc, sync::Arc};
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 
+const USER_AGENT_DEFAULT: &str = "okh-scraper github.com/iop-alliance/OpenKnowHow";
+
 #[derive(Error, Debug)]
 pub enum SettingsError {
     #[error("Failed to load the basic/low-level configuration data: {0}")]
@@ -37,7 +39,7 @@ pub struct Database {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct IntermediateSettings {
-    pub user_agent: String,
+    pub user_agent: Option<String>,
     pub database: Database,
     pub scrapers: HashMap<String, HashMap<String, Value>>,
 }
@@ -59,7 +61,10 @@ impl IntermediateSettings {
     #[must_use]
     pub fn partial(&self) -> PartialSettings {
         PartialSettings {
-            user_agent: self.user_agent.clone(),
+            user_agent: self
+                .user_agent
+                .clone()
+                .unwrap_or_else(|| USER_AGENT_DEFAULT.to_owned()),
             database: self.database.clone(),
         }
     }
@@ -107,7 +112,9 @@ impl IntermediateSettings {
         }
 
         Ok(Settings {
-            user_agent: self.user_agent,
+            user_agent: self
+                .user_agent
+                .unwrap_or_else(|| USER_AGENT_DEFAULT.to_owned()),
             database: self.database,
             scrapers,
         })
