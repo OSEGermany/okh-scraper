@@ -31,7 +31,7 @@ nursery = { level = "warn", priority = -1 }
 cargo = { level = "warn", priority = -1 }
 wildcard_enum_match_arm = "warn"
 string_slice = "warn"
-indexing_slicing = "warn"
+# indexing_slicing = "warn"
 clone_on_ref_ptr = "warn"
 try_err = "warn"
 shadow_reuse = "warn"
@@ -40,9 +40,9 @@ else_if_without_else = "warn"
 use_debug = "warn"
 print_stdout = "warn"
 print_stderr = "warn"
-# missing_errors_doc = "allow"
-# missing_panics_doc = "allow"
-# indexing_slicing = "allow"
+indexing_slicing = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
 result_large_err = "allow"
 
 [dependencies]
