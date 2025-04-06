@@ -19,13 +19,15 @@ use crate::{
 use async_stream::stream;
 use async_trait::async_trait;
 use futures::{stream::BoxStream, stream::StreamExt};
+use model::Projects;
 use reqwest::header::{HeaderMap, ACCEPT};
 use reqwest_middleware::ClientWithMiddleware;
 use serde::Deserialize;
 use serde_json::Value;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::LazyLock;
+
+mod model;
 
 pub const HOSTING_PROVIDER_ID: HostingProviderId = HostingProviderId::AppropediaOrg;
 
@@ -165,57 +167,5 @@ impl Scraper {
             .await?;
         tracing::debug!("{res:#?}");
         Ok(res.into())
-    }
-}
-
-#[derive(Deserialize, Debug)]
-struct Limits {
-    #[serde(rename = "categorymembers")]
-    category_members: usize,
-}
-
-#[derive(Deserialize, Debug)]
-struct Page {
-    // #[serde(rename = "pageid")]
-    // id: usize,
-    // ns: usize,
-    title: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct Query {
-    #[serde(rename = "categorymembers")]
-    category_members: Vec<Page>,
-}
-
-#[derive(Deserialize, Debug)]
-struct Projects {
-    // #[serde(rename = "batchcomplete")]
-    // batch_complete: String,
-    limits: Limits,
-    query: Query,
-}
-
-impl Projects {
-    // NOTE Do **NOT** make this `const`! It will fail on CI.
-    pub fn check_limit(&self, hosting_provider: HostingProviderId) -> Result<(), Error> {
-        if self.query.category_members.len() == self.limits.category_members {
-            return Err(Error::FetchLimitReached(
-                hosting_provider,
-                self.limits.category_members,
-            ));
-        }
-        Ok(())
-    }
-}
-
-impl From<Projects> for Vec<String> {
-    fn from(value: Projects) -> Self {
-        value
-            .query
-            .category_members
-            .iter()
-            .map(|p| p.title.clone())
-            .collect()
     }
 }
