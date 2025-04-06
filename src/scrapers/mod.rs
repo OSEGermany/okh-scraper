@@ -202,8 +202,6 @@ pub enum Error {
         "Failed to deserialize a fetched JSON result to our Rust model of the expected type: {0}"
     )]
     DeserializeFailed(#[source] serde_json::Error, String),
-    #[error("OSHWA API returned error content: {0}")]
-    OshwaApiError(#[from] oshwa::ApiError), // TODO Really, we should not have such scraper-specific errors here
     #[error("Hosting technology (e.g. platform) API returned error: {0}")]
     HostingApiMsg(String),
     #[error("Project that was tired to scrape is not publicly visible, either on purpose by the authors, or because it is flagged as violating some rules.")]
@@ -235,7 +233,6 @@ impl Error {
             | Self::FetchLimitReached(_, _)
             | Self::DeserializeAsJsonFailed(_, _)
             | Self::DeserializeFailed(_, _)
-            | Self::OshwaApiError(_)
             | Self::HostingApiMsg(_)
             | Self::ProjectNotPublic
             | Self::ProjectNotOpenSource(_)
