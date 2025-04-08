@@ -46,12 +46,6 @@ pub type RL = governor::RateLimiter<
 const DEFAULT_RETRIES: u32 = 3;
 const DEFAULT_TIMEOUT: u64 = 10000;
 
-pub static USER_AGENT_VALUE: LazyLock<header::HeaderValue> = LazyLock::new(|| {
-    "okh-scraper github.com/iop-alliance/OpenKnowHow"
-        .parse()
-        .unwrap()
-});
-
 pub trait Config {
     fn hosting_provider(&self) -> HostingProviderId;
 }
@@ -297,9 +291,12 @@ impl std::fmt::Display for dyn Scraper {
 /// Creates a default set of headers for downloads.
 /// @param authorization This is not the bare access token,
 ///   but already has to contain the "Bearer " prefix
-fn create_headers(authorization: Option<String>) -> header::HeaderMap {
+fn create_headers(
+    config_all: &PartialSettings,
+    authorization: Option<String>,
+) -> header::HeaderMap {
     let mut headers = header::HeaderMap::new();
-    headers.insert(header::USER_AGENT, USER_AGENT_VALUE.clone());
+    headers.insert(header::USER_AGENT, config_all.user_agent.parse().unwrap());
     if let Some(access_token_val) = authorization {
         // Consider marking security-sensitive headers with `set_sensitive`.
         let mut auth_value = header::HeaderValue::from_str(&access_token_val)
@@ -336,23 +333,27 @@ pub fn create_downloader_retry(config: &impl RetryConfig) -> Arc<ClientWithMiddl
     ))
 }
 
-pub fn create_downloader_ac(config: &impl AccessControlConfig) -> Arc<ClientWithMiddleware> {
+pub fn create_downloader_ac(
+    config_all: &PartialSettings,
+    config: &impl AccessControlConfig,
+) -> Arc<ClientWithMiddleware> {
     let authorization = Some(format!("Bearer {}", config.access_token()));
     Arc::new(create_downloader(
         DEFAULT_RETRIES,
         DEFAULT_TIMEOUT,
-        Some(create_headers(authorization)),
+        Some(create_headers(config_all, authorization)),
     ))
 }
 
 pub fn create_downloader_retry_ac<T: RetryConfig + AccessControlConfig>(
+    config_all: &PartialSettings,
     config: &T,
 ) -> Arc<ClientWithMiddleware> {
     let authorization = Some(format!("Bearer {}", config.access_token()));
     Arc::new(create_downloader(
         config.retries().unwrap_or(DEFAULT_RETRIES),
         config.timeout().unwrap_or(DEFAULT_TIMEOUT),
-        Some(create_headers(authorization)),
+        Some(create_headers(config_all, authorization)),
     ))
 }
 

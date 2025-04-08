@@ -156,7 +156,7 @@ impl IScraperFactory for ScraperFactory {
         let config: Config = serde_json::from_value(config_scraper).map_err(|serde_err| {
             CreationError::InvalidConfig(SCRAPER_TYPE.name.to_owned(), Some(serde_err))
         })?;
-        let downloader = create_downloader_retry_ac(&config);
+        let downloader = create_downloader_retry_ac(config_all.as_ref(), &config);
         Ok(Box::new(Scraper {
             config_all,
             config,

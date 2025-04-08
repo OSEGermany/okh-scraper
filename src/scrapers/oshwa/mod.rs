@@ -97,7 +97,7 @@ impl IScraperFactory for ScraperFactory {
         config_scraper: Value,
     ) -> Result<Box<dyn IScraper>, CreationError> {
         let config: Config = serde_json::from_value(config_scraper).unwrap();
-        let downloader = create_downloader_retry_ac(&config);
+        let downloader = create_downloader_retry_ac(config_all.as_ref(), &config);
         Ok(Box::new(Scraper {
             config_all,
             config,
