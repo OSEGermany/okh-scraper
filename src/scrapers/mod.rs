@@ -178,6 +178,8 @@ pub enum Error {
     IOError(#[from] std::io::Error), // TODO Too low level to be here, and no circumstances info
     #[error("Reached (and surpassed) the API rate-limit")]
     RateLimitReached,
+    #[error("API access blocked; reason: {0}")]
+    ApiAccessBlocked(String),
     #[error("Failed to fetch a git repo (asynchronously): '{0}'")]
     FailedGitFetch(#[from] asyncgit::Error),
     #[error("Failed to do git operation: '{0}'")]
@@ -216,7 +218,7 @@ impl Error {
     #[must_use]
     pub const fn aborts(&self) -> bool {
         match self {
-            Self::IOError(_) | Self::RateLimitReached => true,
+            Self::IOError(_) | Self::RateLimitReached | Self::ApiAccessBlocked(_) => true,
             Self::FailedGitClone(_)
             | Self::FailedGitFetch(_)
             | Self::FailedGit(_)

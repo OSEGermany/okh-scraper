@@ -245,6 +245,15 @@ pub enum Error {
         "Reached (and surpassed) the Thingiverse API rate-limit; Aborting the scraping process!"
     )]
     RateLimitReached,
+    #[error(
+        "Thingiverse blocked the API request,
+probably due to over-use of a single HTTP header 'user-agent' value,
+asking for a human-verification through HTML and JS;
+You might want to set a new user_agent value in the settings,
+or remove the setting all-together,
+which will cause the user-agent to be automatically (re-)generated in intervals!"
+    )]
+    UserAgentBlocked,
     #[error("Network/Internet download failed: '{0}'")]
     DownloadError(#[from] reqwest::Error),
     #[error("Network/Internet download failed: '{0}'")]
@@ -284,6 +293,7 @@ impl From<Error> for SuperError {
             Error::ProjectDoesNotExist(_) => Self::ProjectDoesNotExist,
             Error::IOError(err) => Self::IOError(err),
             Error::RateLimitReached => Self::RateLimitReached,
+            Error::UserAgentBlocked => Self::ApiAccessBlocked(other.to_string()),
             Error::DownloadError(err) => Self::DownloadError(err),
             Error::DownloadMiddlewareError(err) => Self::DownloadMiddlewareError(err),
         }
@@ -304,6 +314,7 @@ impl Error {
             Self::ProjectDoesNotExist(_) => Some(ThingState::DoesNotExist),
             Self::IOError(_)
             | Self::RateLimitReached
+            | Self::UserAgentBlocked
             | Self::DownloadError(_)
             | Self::DownloadMiddlewareError(_) => None,
         }
@@ -320,6 +331,7 @@ impl Error {
             | Self::ProjectDoesNotExist(_)
             | Self::IOError(_)
             | Self::RateLimitReached
+            | Self::UserAgentBlocked
             | Self::DownloadError(_)
             | Self::DownloadMiddlewareError(_) => None,
         }
@@ -397,6 +409,11 @@ enum ApiResponse<T: serde::de::DeserializeOwned> {
     /// Indicates that the rate limit has been reached.
     /// No actual data was received.
     RateLimitReached,
+    /// It looks like Thingiverse blocks requests
+    /// depending on the HTTP header value of "user-agent
+    /// when it is used too often/by multiple requesters;
+    /// or so is our guess.
+    UserAgentBlocked,
 }
 
 impl<T: serde::de::DeserializeOwned> ApiResponse<T> {
@@ -412,6 +429,7 @@ impl<T: serde::de::DeserializeOwned> ApiResponse<T> {
             Self::Json(json, raw_content) => ApiResponse::Json(json, raw_content),
             Self::Text(err, raw_content) => ApiResponse::Text(err, raw_content),
             Self::RateLimitReached => ApiResponse::RateLimitReached,
+            Self::UserAgentBlocked => ApiResponse::UserAgentBlocked,
         }
     }
 
@@ -422,6 +440,7 @@ impl<T: serde::de::DeserializeOwned> ApiResponse<T> {
             Self::Json(err, raw_content) => Err(Error::DeserializeFailed(err, raw_content)),
             Self::Text(err, raw_content) => Err(Error::DeserializeAsJsonFailed(err, raw_content)),
             Self::RateLimitReached => Err(Error::RateLimitReached),
+            Self::UserAgentBlocked => Err(Error::UserAgentBlocked),
         }
     }
 }
@@ -461,6 +480,8 @@ impl Scraper {
                 // if content == "You can only send 300 requests per 5 minutes. Please check https://www.thingiverse.com/developers/getting-started" {
                 return if content.starts_with("You can only send ") {
                     ApiResponse::RateLimitReached
+                } else if content.contains("<title>Just a moment...</title>") {
+                    ApiResponse::UserAgentBlocked
                 } else {
                     ApiResponse::Text(serde_err, content)
                 };
