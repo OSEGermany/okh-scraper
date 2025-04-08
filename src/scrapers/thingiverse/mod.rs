@@ -249,10 +249,10 @@ pub enum Error {
     DownloadError(#[from] reqwest::Error),
     #[error("Network/Internet download failed: '{0}'")]
     DownloadMiddlewareError(#[from] reqwest_middleware::Error),
-    #[error("Failed to deserialize a fetched result to JSON: {0}")]
+    #[error("Failed to deserialize a fetched result to JSON: {0}\n\tcontent:\n{1}")]
     DeserializeAsJsonFailed(#[source] serde_json::Error, String),
     #[error(
-        "Failed to deserialize a fetched JSON result to our Rust model of the expected type: {0}"
+        "Failed to deserialize a fetched JSON result to our Rust model of the expected type: {0}\n\tcontent:\n{1}"
     )]
     DeserializeFailed(#[source] serde_json::Error, String),
     #[error("Thing with ID {0} failed to fetch; API returned error: {1}")]
