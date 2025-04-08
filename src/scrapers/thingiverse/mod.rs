@@ -488,6 +488,13 @@ both as the expected type and as an error response:\n{serde_err}\n{err_err}"
     async fn fetch_latest_thing_id(client: Arc<ClientWithMiddleware>) -> Result<ThingId, Error> {
         tracing::debug!("Fetching latest thing ID ...");
 
+        // To try the same on the CLI:
+        // curl -L \
+        //     --url-query type=things \
+        //     --url-query per_page=1 \
+        //     --url-query sort=newest \
+        //     -H "authorization: Bearer XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+        //     "https://api.thingiverse.com/search/"
         let params = [("type", "things"), ("per_page", "1"), ("sort", "newest")];
         let res_raw_text =
             Self::fetch_as_text(client, "https://api.thingiverse.com/search/", &params).await?;
