@@ -363,17 +363,17 @@ impl Scraper {
             .into_thing_result()
         {
             Ok(state) => {
-                tracing::info!("thing {thing_id} - fetched and open source");
+                tracing::info!("thing {thing_id} - positive - fetched and open source");
                 (ThingState::OpenSource, Some(state.1), Ok(state.0))
             }
             Err(err) => {
                 let thing_state_opt = err.to_thing_state();
                 if let Some(thing_state) = thing_state_opt {
-                    tracing::warn!("thing {thing_id} - {thing_state} - {err}");
+                    tracing::info!("thing {thing_id} - negative - {thing_state} - {err}");
                     (thing_state, err.to_raw_api_response().cloned(), Err(err))
                 } else {
                     tracing::error!(
-                        "thing {thing_id} - fatal error; aborting thingiverse scraping: {err}"
+                        "thing {thing_id} - negative - fatal error; aborting thingiverse scraping: {err}"
                     );
                     return Err(err);
                 }
