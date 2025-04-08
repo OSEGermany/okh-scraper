@@ -140,8 +140,6 @@ mkdir okh-scraper-root
 cd okh-scraper-root
 
 cat > config.yml << EOF
-user_agent: "new-projects-fetcherfetcher"
-
 database:
   type: file       # (opt) nothing else implemented
   path: ./workdir  # (opt)
