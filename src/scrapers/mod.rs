@@ -325,28 +325,37 @@ pub fn create_downloader_retry(config: &impl RetryConfig) -> Arc<ClientWithMiddl
     ))
 }
 
+fn create_downloader_ac_retries(
+    config_all: &PartialSettings,
+    config: &impl AccessControlConfig,
+    retries: u32,
+    timeout: u64,
+) -> Arc<ClientWithMiddleware> {
+    let authorization = Some(format!("Bearer {}", config.access_token()));
+    Arc::new(create_downloader(
+        retries,
+        timeout,
+        Some(create_headers(config_all, authorization)),
+    ))
+}
+
 pub fn create_downloader_ac(
     config_all: &PartialSettings,
     config: &impl AccessControlConfig,
 ) -> Arc<ClientWithMiddleware> {
-    let authorization = Some(format!("Bearer {}", config.access_token()));
-    Arc::new(create_downloader(
-        DEFAULT_RETRIES,
-        DEFAULT_TIMEOUT,
-        Some(create_headers(config_all, authorization)),
-    ))
+    create_downloader_ac_retries(config_all, config, DEFAULT_RETRIES, DEFAULT_TIMEOUT)
 }
 
 pub fn create_downloader_retry_ac<T: RetryConfig + AccessControlConfig>(
     config_all: &PartialSettings,
     config: &T,
 ) -> Arc<ClientWithMiddleware> {
-    let authorization = Some(format!("Bearer {}", config.access_token()));
-    Arc::new(create_downloader(
+    create_downloader_ac_retries(
+        config_all,
+        config,
         config.retries().unwrap_or(DEFAULT_RETRIES),
         config.timeout().unwrap_or(DEFAULT_TIMEOUT),
-        Some(create_headers(config_all, authorization)),
-    ))
+    )
 }
 
 // pub fn assemble_scraper_factories() -> HashMap<String, impl ScraperFactory> {
