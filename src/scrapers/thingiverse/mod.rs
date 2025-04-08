@@ -218,10 +218,15 @@ impl IScraper for Scraper {
         stream! {
             'main: loop {
                 let mut store_slice = store.get_next_slice().await?;
+                let mut marked_current_slice_as_being_scraped = false;
                 let mut store_slice = store_slice.write().await;
                 tracing::debug!("Looking for untried things in store slice {} ...", store_slice.range_min);
                 let previously_os_things = store_slice.cloned_os(); // TODO Once we have an initial scrape, we should implement scraping these again, after this loop that scraped the yet untried
                 'slice: while let Some(thing_id) = store_slice.next_id(ThingState::Untried) {
+                    if !marked_current_slice_as_being_scraped {
+                        store.write_slice_being_scraped().await?;
+                        marked_current_slice_as_being_scraped = true;
+                    }
                     let res = Self::scrape_one(Arc::<_>::clone(&client), &mut store, &mut store_slice, thing_id, ThingState::Untried).await;
                     let abort = if let Err(err) = &res { err.aborts() } else { false };
                     yield res.map_err(SuperError::from);

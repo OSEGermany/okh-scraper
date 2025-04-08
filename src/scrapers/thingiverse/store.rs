@@ -156,6 +156,27 @@ impl ThingState {
             Self::Proprietary | Self::OpenSource => true,
         }
     }
+
+    /// The higher this value,
+    /// the more we value the states output/API response content.
+    const fn output_value(self) -> u8 {
+        match self {
+            Self::FailedToFetch | Self::DoesNotExist | Self::Banned | Self::Untried => 1,
+            Self::FailedToParse => 2,
+            Self::Proprietary => 3,
+            Self::OpenSource => 4,
+        }
+    }
+
+    /// Returns `true` if `self`s output/API response content is preferred over `other`s.
+    /// If they are of equal value, then `self` is preferred over `other`,
+    /// assuming it might be an updated version.
+    /// NOTE This could be dangerous, if we do not record history,
+    ///      and the platform would try to fill our index with garbage.
+    #[must_use]
+    pub const fn prefer_new_output_over_old(self, old: Self) -> bool {
+        self.output_value() >= old.output_value()
+    }
 }
 
 impl Display for ThingState {
@@ -374,13 +395,27 @@ we require the content of the thing, put it was not provided",
         }
 
         let thing_id = thing_meta.get_id();
-        self.meta.get_mut(&state).unwrap().push_back(thing_meta);
-        self.write(state).await?;
-        if let Some(next_untried) = self.meta.get(&ThingState::Untried).unwrap().front() {
-            if (next_untried.get_id() == thing_id) {
+        // First, remove from the old states things list
+        let mut old_state_things = self.meta.get_mut(&thing_state_old).unwrap();
+        if let Some(next_thing_old_state) = old_state_things.front() {
+            if (next_thing_old_state.get_id() == thing_id) {
                 self.meta.get_mut(&ThingState::Untried).unwrap().pop_front();
+            } else {
+                return Err(io::Error::new(io::ErrorKind::NotFound,
+                    format!("Failed to remove the thing with Id {thing_id} from the old state {thing_state_old}")));
             }
         }
+        // ... and only then add to the new one.
+        // This way, we might miss saving the new state,
+        // but that at least is not an overall invalid state of the store;
+        // we would just miss the thing in the new state,
+        // and would thus re-scrape it next time.
+        // NOTE: That means we loose the whole scraping meta-data history of that thing!
+        //       A better option would e to implement a transaction system,
+        //       where we roll back an unfinished/failed state-change,
+        //       when running the scraper again.
+        self.meta.get_mut(&state).unwrap().push_back(thing_meta);
+        self.write(state).await?;
         Ok(())
     }
 
@@ -512,6 +547,10 @@ pub struct ThingStore {
     slices: HashMap<ThingId, Arc<sync::RwLock<ThingStoreSlice>>>,
     /// Time when the last thing was scraped, no matter its state.
     last_scrape: DateTime<Utc>,
+    /// The current slice that is/will be scraped.
+    current_scrape_slice: ThingId,
+    /// The next slice that should be scraped.
+    next_scrape_slice: ThingId,
 }
 
 impl ThingStore {
@@ -562,10 +601,13 @@ can not be smaller then ({MIN_SLICE_SIZE})"
             slice_size,
             slices: HashMap::new(),
             last_scrape: earliest(),
+            current_scrape_slice: range_min,
+            next_scrape_slice: range_min,
         };
         if let Some(last_scrape) = read_last_scrape(last_scrape_file(&res.root_dir, false)).await? {
             res.last_scrape = last_scrape;
         }
+        res.read_slice_being_scraped().await?;
 
         Ok(res)
     }
@@ -582,28 +624,73 @@ can not be smaller then ({MIN_SLICE_SIZE})"
         self.range() / self.slice_size
     }
 
+    /// Create, store and return a new slice.
+    async fn create_new_slice(
+        &self,
+        slice_range_min: ThingId,
+    ) -> io::Result<Arc<sync::RwLock<ThingStoreSlice>>> {
+        let slice_range_max = slice_range_min + self.slice_size;
+        let base_dir = self.root_dir.join("data").join(slice_range_min.to_string());
+        ensure_dir_exists(&base_dir).await?;
+        let slice = Arc::new(sync::RwLock::new(
+            ThingStoreSlice::new(base_dir, slice_range_min, slice_range_max).await?,
+        ));
+        Ok(slice)
+    }
+
+    async fn get_slice(
+        &mut self,
+        slice_range_min: ThingId,
+    ) -> io::Result<Arc<sync::RwLock<ThingStoreSlice>>> {
+        Ok(Arc::<_>::clone(
+            if let Some(child) = self.slices.get(&slice_range_min) {
+                child
+            } else {
+                let value = self.create_new_slice(slice_range_min).await?;
+                self.slices.insert(slice_range_min, value);
+                self.slices.get(&slice_range_min).unwrap()
+            },
+        ))
+    }
+
     /// The next slice to be scraped.
     /// This is either the store slice that has the oldest [`Self::last_scrape`] time,
     /// or if not all slices have been scraped yet,
     /// the un-scraped one with the lowest range.
     pub async fn get_next_slice(&mut self) -> io::Result<Arc<sync::RwLock<ThingStoreSlice>>> {
-        Ok(
-            if ThingId::try_from(self.slices.len()).unwrap() < self.total_slices() {
-                // create and return a new slice
-                let slice_range_min = self.range_min
-                    + (ThingId::try_from(self.slices.len()).unwrap() * self.slice_size);
-                let slice_range_max = slice_range_min + self.slice_size;
-                let base_dir = self.root_dir.join("data").join(slice_range_min.to_string());
-                ensure_dir_exists(&base_dir).await?;
-                let slice = Arc::new(sync::RwLock::new(
-                    ThingStoreSlice::new(base_dir, slice_range_min, slice_range_max).await?,
-                ));
-                self.slices.insert(slice_range_min, Arc::<_>::clone(&slice));
-                slice
-            } else {
-                Arc::<_>::clone(self.slices.iter().next().unwrap().1)
-            },
-        )
+        let next = self.next_scrape_slice;
+        let slice = self.get_slice(self.next_scrape_slice).await?;
+        self.current_scrape_slice = self.next_scrape_slice;
+        self.next_scrape_slice = (self.next_scrape_slice + self.slice_size) % (self.range_max + 1);
+        Ok(slice)
+    }
+
+    #[must_use]
+    pub fn current_scrape_slice_file_path(&self) -> PathBuf {
+        construct_file_path(&self.root_dir, "last_scrape_slice.csv", false)
+    }
+
+    pub async fn write_slice_being_scraped(&mut self) -> io::Result<()> {
+        let file_path = self.current_scrape_slice_file_path();
+        fs::write(&file_path, self.current_scrape_slice.to_string()).await
+    }
+
+    pub async fn read_slice_being_scraped(&mut self) -> io::Result<()> {
+        let file_path = self.current_scrape_slice_file_path();
+
+        if file_path.as_path().exists().await {
+            let slice_min_str = fs::read_to_string(file_path).await?;
+            let slice_min: u32 = slice_min_str.parse::<ThingId>().map_err(|parse_err| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Failed to parse last scraped slice ({slice_min_str}): {parse_err}"),
+                )
+            })?;
+            self.current_scrape_slice = slice_min;
+            self.next_scrape_slice = slice_min;
+        }
+
+        Ok(())
     }
 
     // NOTE Do **NOT** make this `const`! It will fail on CI.
