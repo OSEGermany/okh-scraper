@@ -218,7 +218,6 @@ impl Error {
         match self {
             Self::IOError(_) | Self::RateLimitReached => true,
             Self::FailedGitClone(_)
-            | Self::RateLimitReached
             | Self::FailedGitFetch(_)
             | Self::FailedGit(_)
             | Self::FindError(_)
