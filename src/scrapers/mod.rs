@@ -280,6 +280,21 @@ impl std::fmt::Display for dyn Scraper {
     }
 }
 
+use rand::Rng;
+
+fn generate_random_string() -> String {
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.?/:_-";
+    let mut rng = rand::rng();
+    let length = rng.random_range(8..64);
+
+    (0..length)
+        .map(|_| {
+            let idx = rng.random_range(0..CHARSET.len());
+            CHARSET[idx] as char
+        })
+        .collect()
+}
+
 /// Creates a default set of headers for downloads.
 /// @param authorization This is not the bare access token,
 ///   but already has to contain the "Bearer " prefix
@@ -288,7 +303,15 @@ fn create_headers(
     authorization: Option<String>,
 ) -> header::HeaderMap {
     let mut headers = header::HeaderMap::new();
-    headers.insert(header::USER_AGENT, config_all.user_agent.parse().unwrap());
+    headers.insert(
+        header::USER_AGENT,
+        config_all
+            .user_agent
+            .clone()
+            .unwrap_or_else(generate_random_string)
+            .parse()
+            .unwrap(),
+    );
     if let Some(access_token_val) = authorization {
         // Consider marking security-sensitive headers with `set_sensitive`.
         let mut auth_value = header::HeaderValue::from_str(&access_token_val)
