@@ -218,14 +218,16 @@ impl Error {
     #[must_use]
     pub const fn aborts(&self) -> bool {
         match self {
-            Self::IOError(_) | Self::RateLimitReached | Self::ApiAccessBlocked(_) => true,
+            Self::FetchLimitReached(_, _)
+            | Self::IOError(_)
+            | Self::RateLimitReached
+            | Self::ApiAccessBlocked(_) => true,
             Self::FailedGitClone(_)
             | Self::FailedGitFetch(_)
             | Self::FailedGit(_)
             | Self::FindError(_)
             | Self::DownloadError(_)
             | Self::DownloadMiddlewareError(_)
-            | Self::FetchLimitReached(_, _)
             | Self::DeserializeAsJsonFailed(_, _)
             | Self::DeserializeFailed(_, _)
             | Self::HostingApiMsg(_)
