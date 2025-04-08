@@ -128,17 +128,6 @@ impl Config for ACPlatformBaseConfig {
     }
 }
 
-// impl DownloadCreator for ACPlatformBaseConfig {
-//     fn create_downloader(&self) -> Arc<ClientWithMiddleware> {
-//         let authorization = Some(format!("Bearer {}", self.access_token()));
-//         Arc::new(
-//             create_downloader(
-//                 self.retries().unwrap_or(DEFAULT_RETRIES),
-//                 self.timeout().unwrap_or(DEFAULT_TIMEOUT),
-//             Some(create_headers(authorization))))
-//     }
-// }
-
 impl RetryConfig for ACPlatformBaseConfig {
     fn retries(&self) -> Option<u32> {
         self.retries
