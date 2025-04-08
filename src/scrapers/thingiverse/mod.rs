@@ -222,7 +222,7 @@ impl IScraper for Scraper {
                 tracing::debug!("Looking for untired things in store slice {} ...", store_slice.range_min);
                 let previously_os_things = store_slice.cloned_os(); // TODO Once we have an initial scrape, we should implement scraping these again, after this loop that scraped the yet untried
                 'slice: while let Some(thing_id) = store_slice.next_id(ThingState::Untried) {
-                    let res = Self::scrape_one(Arc::<_>::clone(&client), &mut store, &mut store_slice, thing_id).await;
+                    let res = Self::scrape_one(Arc::<_>::clone(&client), &mut store, &mut store_slice, thing_id, ThingState::Untried).await;
                     let abort = if let Err(err) = &res { err.aborts() } else { false };
                     yield res.map_err(SuperError::from);
                     if abort {
@@ -354,6 +354,7 @@ impl Scraper {
         store: &mut ThingStore,
         store_slice: &mut ThingStoreSlice,
         thing_id: ThingId,
+        thing_state_old: ThingState,
     ) -> Result<Project, Error> {
         // We want this time to be as close as possible to the fetch,
         // but rather before then after it.
@@ -380,7 +381,9 @@ impl Scraper {
             }
         };
         let thing_meta = ThingMeta::new(thing_id, state, fetch_time);
-        store_slice.insert(thing_meta, raw_api_response).await?;
+        store_slice
+            .insert(thing_meta, raw_api_response, thing_state_old)
+            .await?;
         store.set_last_scrape(fetch_time);
         let thing_parsed = thing_parsed_res?;
         let thing_file = store_slice.content_file_path(thing_id, false);

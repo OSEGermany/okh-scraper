@@ -351,6 +351,7 @@ must be >= range_min ({range_min})"
         &mut self,
         thing_meta: ThingMeta,
         thing: Option<S>,
+        thing_state_old: ThingState,
     ) -> io::Result<()> {
         let state = thing_meta.state;
         if matches!(state, ThingState::Untried) {
