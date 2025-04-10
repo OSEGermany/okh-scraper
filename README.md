@@ -116,7 +116,7 @@ After that, you change to the sources dir and compile and install:
 
 ```shell
 cd okh-scraper
-cargo install --path .
+cargo install --locked --path .
 ```
 
 NOTE
