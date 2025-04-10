@@ -210,8 +210,15 @@ pub struct Image {
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(untagged)]
+pub enum StringOrVecString {
+    String(String),
+    Vec(Vec<String>),
+}
+
+#[derive(Deserialize, Debug)]
 pub struct PartDatum {
-    pub content: Option<String>,
+    pub content: Option<StringOrVecString>,
     // NOTE The following are commented out because we don't need them right now; this saves us parsing time.
     // pub printer: Option<String>,
     // pub rafts: Option<String>,
