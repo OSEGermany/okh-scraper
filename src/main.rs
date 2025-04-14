@@ -181,7 +181,13 @@ async fn main() -> Result<(), Error> {
     while let Some(project) = projects.next().await {
         match project {
             Ok(proj) => println!("Scraped project: {}", proj.id),
-            Err(err) => println!("Scraping error:\n{err}"),
+            Err(err) => {
+                if err.aborts() {
+                    println!("Scraping error:\n{err}");
+                } else {
+                    println!("Scraping failed:\n{err}");
+                }
+            },
         }
     }
 
