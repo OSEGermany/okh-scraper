@@ -187,7 +187,7 @@ async fn main() -> Result<(), Error> {
                 } else {
                     println!("Scraping failed:\n{err}");
                 }
-            },
+            }
         }
     }
 
