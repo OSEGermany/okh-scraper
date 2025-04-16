@@ -31,10 +31,10 @@ use crate::{
     settings::PartialSettings,
 };
 
-pub mod appropedia;
-pub mod manifests_repo;
-pub mod oshwa;
-pub mod thingiverse;
+mod appropedia;
+mod manifests_repo;
+mod oshwa;
+mod thingiverse;
 
 pub type RL = governor::RateLimiter<
     governor::state::NotKeyed,
