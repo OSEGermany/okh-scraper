@@ -670,7 +670,7 @@ can not be smaller then ({MIN_SLICE_SIZE})"
         construct_file_path(&self.root_dir, "last_scrape_slice.csv", false)
     }
 
-    pub async fn write_slice_being_scraped(&mut self) -> io::Result<()> {
+    pub async fn write_slice_being_scraped(&self) -> io::Result<()> {
         let file_path = self.current_scrape_slice_file_path();
         fs::write(&file_path, self.current_scrape_slice.to_string()).await
     }
