@@ -245,7 +245,7 @@ impl IScraper for Scraper {
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Some I/O problem: '{0}'")]
-    IOError(#[from] std::io::Error),
+    IO(#[from] std::io::Error),
     #[error(
         "Reached (and surpassed) the Thingiverse API rate-limit; Aborting the scraping process!"
     )]
@@ -260,15 +260,15 @@ which will cause the user-agent to be automatically (re-)generated in intervals!
     )]
     UserAgentBlocked,
     #[error("Network/Internet download failed: '{0}'")]
-    DownloadError(#[from] reqwest::Error),
+    Download(#[from] reqwest::Error),
     #[error("Network/Internet download failed: '{0}'")]
-    DownloadMiddlewareError(#[from] reqwest_middleware::Error),
+    DownloadMiddleware(#[from] reqwest_middleware::Error),
     #[error("Failed to deserialize a fetched result to JSON: {0}\n\tcontent:\n{1}")]
-    DeserializeAsJsonFailed(#[source] serde_json::Error, String),
+    DeserializeAsJson(#[source] serde_json::Error, String),
     #[error(
         "Failed to deserialize a fetched JSON result to our Rust model of the expected type: {0}\n\tcontent:\n{1}"
     )]
-    DeserializeFailed(#[source] serde_json::Error, String),
+    Deserialize(#[source] serde_json::Error, String),
     #[error("Thing with ID {0} failed to fetch; API returned error: {1}")]
     HostingApiMsg(ThingId, String),
     #[error(
@@ -284,10 +284,8 @@ which will cause the user-agent to be automatically (re-)generated in intervals!
 impl From<Error> for SuperError {
     fn from(other: Error) -> Self {
         match other {
-            Error::DeserializeFailed(err, content) => Self::DeserializeFailed(err, content),
-            Error::DeserializeAsJsonFailed(err, content) => {
-                Self::DeserializeAsJsonFailed(err, content)
-            }
+            Error::Deserialize(err, content) => Self::Deserialize(err, content),
+            Error::DeserializeAsJson(err, content) => Self::DeserializeAsJson(err, content),
             Error::HostingApiMsg(thing_id, msg) => {
                 Self::HostingApiMsg(format!("Thing ID {thing_id} - {msg}"))
             }
@@ -296,11 +294,11 @@ impl From<Error> for SuperError {
                 Self::ProjectNotOpenSource(Scraper::to_hosting_unit_id(thing_id))
             }
             Error::ProjectDoesNotExist(_) => Self::ProjectDoesNotExist,
-            Error::IOError(err) => Self::IOError(err),
+            Error::IO(err) => Self::IO(err),
             Error::RateLimitReached => Self::RateLimitReached,
             Error::UserAgentBlocked => Self::ApiAccessBlocked(other.to_string()),
-            Error::DownloadError(err) => Self::DownloadError(err),
-            Error::DownloadMiddlewareError(err) => Self::DownloadMiddlewareError(err),
+            Error::Download(err) => Self::Download(err),
+            Error::DownloadMiddleware(err) => Self::DownloadMiddleware(err),
         }
     }
 }
@@ -309,36 +307,34 @@ impl Error {
     #[must_use]
     pub const fn to_thing_state(&self) -> Option<ThingState> {
         match self {
-            Self::DeserializeFailed(err, raw_api_response)
-            | Self::DeserializeAsJsonFailed(err, raw_api_response) => {
-                Some(ThingState::FailedToParse)
-            }
+            Self::Deserialize(err, raw_api_response)
+            | Self::DeserializeAsJson(err, raw_api_response) => Some(ThingState::FailedToParse),
             Self::HostingApiMsg(_, _) => Some(ThingState::FailedToFetch),
             Self::ProjectNotPublic(_) => Some(ThingState::Banned),
             Self::ProjectNotOpenSource(_) => Some(ThingState::Proprietary),
             Self::ProjectDoesNotExist(_) => Some(ThingState::DoesNotExist),
-            Self::IOError(_)
+            Self::IO(_)
             | Self::RateLimitReached
             | Self::UserAgentBlocked
-            | Self::DownloadError(_)
-            | Self::DownloadMiddlewareError(_) => None,
+            | Self::Download(_)
+            | Self::DownloadMiddleware(_) => None,
         }
     }
 
     #[must_use]
     pub const fn to_raw_api_response(&self) -> Option<&String> {
         match self {
-            Self::DeserializeFailed(_, raw_api_response)
-            | Self::DeserializeAsJsonFailed(_, raw_api_response) => Some(raw_api_response),
+            Self::Deserialize(_, raw_api_response)
+            | Self::DeserializeAsJson(_, raw_api_response) => Some(raw_api_response),
             Self::HostingApiMsg(_, _)
             | Self::ProjectNotPublic(_)
             | Self::ProjectNotOpenSource(_)
             | Self::ProjectDoesNotExist(_)
-            | Self::IOError(_)
+            | Self::IO(_)
             | Self::RateLimitReached
             | Self::UserAgentBlocked
-            | Self::DownloadError(_)
-            | Self::DownloadMiddlewareError(_) => None,
+            | Self::Download(_)
+            | Self::DownloadMiddleware(_) => None,
         }
     }
 
@@ -445,8 +441,8 @@ impl<T: serde::de::DeserializeOwned> ApiResponse<T> {
         match self {
             Self::Success(raw_content, parsed) => Ok((raw_content, parsed)),
             Self::Error(thing_id, api_err) => Err(api_err.into_local_error(thing_id)),
-            Self::Json(err, raw_content) => Err(Error::DeserializeFailed(err, raw_content)),
-            Self::Text(err, raw_content) => Err(Error::DeserializeAsJsonFailed(err, raw_content)),
+            Self::Json(err, raw_content) => Err(Error::Deserialize(err, raw_content)),
+            Self::Text(err, raw_content) => Err(Error::DeserializeAsJson(err, raw_content)),
             Self::RateLimitReached => Err(Error::RateLimitReached),
             Self::UserAgentBlocked => Err(Error::UserAgentBlocked),
         }

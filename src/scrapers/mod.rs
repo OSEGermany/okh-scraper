@@ -162,31 +162,31 @@ pub enum Error {
     // #[error("Invalid config for scraper type '{0}': {1}")]
     // InvalidConfig(String, Value),
     #[error("Failed to clone a git repo (synchronously): '{0}'")]
-    FailedGitClone(#[from] git2::Error),
+    GitClone(#[from] git2::Error),
     #[error("Some I/O problem: '{0}'")]
-    IOError(#[from] std::io::Error), // TODO Too low level to be here, and no circumstances info
+    IO(#[from] std::io::Error), // TODO Too low level to be here, and no circumstances info
     #[error("Reached (and surpassed) the API rate-limit")]
     RateLimitReached,
     #[error("API access blocked; reason: {0}")]
     ApiAccessBlocked(String),
     #[error("Failed to fetch a git repo (asynchronously): '{0}'")]
-    FailedGitFetch(#[from] asyncgit::Error),
+    GitFetch(#[from] asyncgit::Error),
     #[error("Failed to do git operation: '{0}'")]
-    FailedGit(String),
+    Git(String),
     #[error("Error while searching files in a local directory: '{0}'")]
-    FindError(#[from] files_finder::FindError),
+    Find(#[from] files_finder::FindError),
     #[error("Network/Internet download failed: '{0}'")]
-    DownloadError(#[from] reqwest::Error),
+    Download(#[from] reqwest::Error),
     #[error("Network/Internet download failed: '{0}'")]
-    DownloadMiddlewareError(#[from] reqwest_middleware::Error),
+    DownloadMiddleware(#[from] reqwest_middleware::Error),
     #[error("{0} reached (and very likely surpassed) a total number of projects that is higher than the max fetch-limit set in its API ({1}); please inform the {0} admins!")]
     FetchLimitReached(HostingProviderId, usize),
     #[error("Failed to deserialize a fetched result to JSON: {0}")]
-    DeserializeAsJsonFailed(#[source] serde_json::Error, String),
+    DeserializeAsJson(#[source] serde_json::Error, String),
     #[error(
         "Failed to deserialize a fetched JSON result to our Rust model of the expected type: {0}"
     )]
-    DeserializeFailed(#[source] serde_json::Error, String),
+    Deserialize(#[source] serde_json::Error, String),
     #[error("Hosting technology (e.g. platform) API returned error: {0}")]
     HostingApiMsg(String),
     #[error("Project that was tired to scrape is not publicly visible, either on purpose by the authors, or because it is flagged as violating some rules.")]
@@ -198,9 +198,9 @@ pub enum Error {
     #[error("Project that was tired to scrape is not Open Source: {0}")]
     ProjectDoesNotExistId(HostingUnitId),
     #[error("Failed to parse a hosting URL to a hosting-unit-id: {0}")]
-    HostingUnitIdParseError(#[from] hosting_unit_id::ParseError),
-    #[error("Failed pull git repo (asynchronously): {0}")]
-    GitAsyncPullError(#[from] crossbeam_channel::RecvError),
+    HostingUnitIdParse(#[from] hosting_unit_id::ParseError),
+    #[error("Failed to pull git repo (asynchronously): {0}")]
+    GitAsyncPull(#[from] crossbeam_channel::RecvError),
 }
 
 impl Error {
@@ -208,24 +208,24 @@ impl Error {
     pub const fn aborts(&self) -> bool {
         match self {
             Self::FetchLimitReached(_, _)
-            | Self::IOError(_)
+            | Self::IO(_)
             | Self::RateLimitReached
             | Self::ApiAccessBlocked(_) => true,
-            Self::FailedGitClone(_)
-            | Self::FailedGitFetch(_)
-            | Self::FailedGit(_)
-            | Self::FindError(_)
-            | Self::DownloadError(_)
-            | Self::DownloadMiddlewareError(_)
-            | Self::DeserializeAsJsonFailed(_, _)
-            | Self::DeserializeFailed(_, _)
+            Self::GitClone(_)
+            | Self::GitFetch(_)
+            | Self::Git(_)
+            | Self::Find(_)
+            | Self::Download(_)
+            | Self::DownloadMiddleware(_)
+            | Self::DeserializeAsJson(_, _)
+            | Self::Deserialize(_, _)
             | Self::HostingApiMsg(_)
             | Self::ProjectNotPublic
             | Self::ProjectNotOpenSource(_)
             | Self::ProjectDoesNotExist
             | Self::ProjectDoesNotExistId(_)
-            | Self::HostingUnitIdParseError(_)
-            | Self::GitAsyncPullError(_) => false,
+            | Self::HostingUnitIdParse(_)
+            | Self::GitAsyncPull(_) => false,
         }
     }
 }

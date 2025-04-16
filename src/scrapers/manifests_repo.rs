@@ -135,13 +135,13 @@ impl IScraper for Scraper {
                             "Something went wrong while pulling '{fetch_url}': '{notification:#?}'"
                         );
                         return stream! {
-                            yield Err(Error::FailedGit(format!("Something went wrong while pulling '{fetch_url}': '{notification:#?}'")));
+                            yield Err(Error::Git(format!("Something went wrong while pulling '{fetch_url}': '{notification:#?}'")));
                         }.boxed();
                     }
                     Err(err) => {
                         tracing::error!("Error while pulling '{fetch_url}': {err:?}");
                         return stream! {
-                            yield Err(Error::FailedGit(format!("Error while pulling '{fetch_url}': {err:?}")));
+                            yield Err(Error::Git(format!("Error while pulling '{fetch_url}': {err:?}")));
                         }.boxed();
                     }
                 }

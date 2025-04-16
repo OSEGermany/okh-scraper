@@ -184,7 +184,7 @@ impl Scraper {
             Ok(json_val) => json_val,
             Err(serde_err) => {
                 tracing::warn!("Failed to parse OSHWA API response as JSON:\n{serde_err}");
-                return Err(Error::DeserializeAsJsonFailed(serde_err, raw_text));
+                return Err(Error::DeserializeAsJson(serde_err, raw_text));
             }
         };
 
@@ -201,7 +201,7 @@ impl Scraper {
                     "Failed to parse OSHWA API response (JSON), \
 both as the expected type and as an error response:\n{serde_err}\n{err_err}"
                 );
-                Err(Error::DeserializeFailed(serde_err, raw_text))
+                Err(Error::Deserialize(serde_err, raw_text))
             }
             Ok(parsed) => Ok(parsed),
         }
