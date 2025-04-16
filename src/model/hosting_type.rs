@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use crate::scrapers::manifests_repo;
-
 use super::hosting_category;
 use hosting_category::HostingCategory;
 use std::fmt;
