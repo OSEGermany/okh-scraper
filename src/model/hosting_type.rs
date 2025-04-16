@@ -50,6 +50,12 @@ pub static HTI_OSHWA: LazyLock<HostingTypeInfo> = LazyLock::new(|| HostingTypeIn
     network_topology: NetworkTopology::Centralized,
 });
 
+pub static HTI_THINGIVERSE: LazyLock<HostingTypeInfo> = LazyLock::new(|| HostingTypeInfo {
+    name: "Thingiverse - Platform for sharing 3D printable things",
+    url: "https://www.thingiverse.com/",
+    network_topology: NetworkTopology::Centralized,
+});
+
 /// Type of hosting technology,
 /// meaning the software used to host,
 /// in case of (de)centralized systems,
@@ -105,7 +111,7 @@ impl HostingType {
             Self::GitLab => todo!("Implement"),
             Self::Appropedia => &HTI_APPROPEDIA,
             Self::Oshwa => &HTI_OSHWA,
-            Self::Thingiverse => todo!("Implement"),
+            Self::Thingiverse => &HTI_THINGIVERSE,
             Self::ManifestsRepo => &HTI_MANIFESTS_REPO,
         }
     }
