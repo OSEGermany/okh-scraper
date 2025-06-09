@@ -42,7 +42,7 @@ pub static RE_MANIFEST_FILE: LazyLock<Regex> =
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
-    /// The git Fetch URL of the repository
+    /// The git fetch URL of the repository
     /// that contains manifest files.
     /// As of now, this has to be a public, anonymous access URL.
     repo_fetch_url: String,
