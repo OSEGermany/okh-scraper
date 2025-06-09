@@ -181,10 +181,10 @@ pub enum Error {
     DownloadMiddleware(#[from] reqwest_middleware::Error),
     #[error("{0} reached (and very likely surpassed) a total number of projects that is higher than the max fetch-limit set in its API ({1}); please inform the {0} admins!")]
     FetchLimitReached(HostingProviderId, usize),
-    #[error("Failed to deserialize a fetched result to JSON: {0}")]
+    #[error("Failed to deserialize a fetched result to JSON:\n{0}\ncontent:\n{1}")]
     DeserializeAsJson(#[source] serde_json::Error, String),
     #[error(
-        "Failed to deserialize a fetched JSON result to our Rust model of the expected type: {0}"
+        "Failed to deserialize a fetched JSON result to our Rust model of the expected type.\nerror:\n{0}\ncontent:\n{1}"
     )]
     Deserialize(#[source] serde_json::Error, String),
     #[error("Hosting technology (e.g. platform) API returned error: {0}")]
