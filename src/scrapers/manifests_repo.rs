@@ -128,7 +128,7 @@ impl IScraper for Scraper {
             for notification_idx in 0..2 {
                 match r.recv() {
                     Ok(AsyncGitNotification::Pull) => {
-                        tracing::trace!("Received pull notification {notification_idx}/2.");
+                        tracing::trace!("Received pull notification {}/2.", notification_idx + 1);
                     }
                     Ok(notification) => {
                         tracing::error!(
