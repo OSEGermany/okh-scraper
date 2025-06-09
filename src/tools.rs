@@ -44,7 +44,7 @@ pub const LICENSE_PROPRIETARY: SpdxLicenseExpression =
 /// assert_eq!(url_encode(r#"Hello World"#), "Hello%20World");
 /// ```
 #[must_use]
-pub fn url_encode(input: &str) -> Cow<str> {
+pub fn url_encode(input: &str) -> Cow<'_, str> {
     encode(input)
     // form_urlencoded::byte_serialize(input.as_bytes()).collect()
 }
