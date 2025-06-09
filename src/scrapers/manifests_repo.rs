@@ -46,6 +46,8 @@ pub struct Config {
     /// that contains manifest files.
     /// As of now, this has to be a public, anonymous access URL.
     repo_fetch_url: String,
+    /// The git ref (branch, tag, commit hash, etc.) to fetch
+    r#ref: String,
     retries: Option<u32>,
     timeout: Option<u64>,
 }
@@ -104,6 +106,7 @@ impl IScraper for Scraper {
     // #[instrument]
     async fn scrape(&self) -> BoxStream<'static, Result<Project, Error>> {
         let fetch_url = self.config.repo_fetch_url.clone();
+        let r#ref = self.config.r#ref.clone();
         let repo_local_dir = self.generate_repo_local_dir(&fetch_url);
         tracing::info!(
             "Fetching manifests containing remote repo '{fetch_url}' to local dir '{}' ...",
@@ -117,7 +120,12 @@ impl IScraper for Scraper {
             let repo_path = RepoPath::Path(repo_local_dir.clone());
             let (s1, r) = unbounded();
             let pull = AsyncPull::new(repo_path, &s1);
-            if let Err(err) = pull.request(FetchRequest::default()) {
+            let fetch_request = FetchRequest {
+                remote: fetch_url.clone(),
+                branch: r#ref,
+                ..Default::default()
+            };
+            if let Err(err) = pull.request(fetch_request) {
                 return stream! {
                     yield Err(err.into());
                 }
