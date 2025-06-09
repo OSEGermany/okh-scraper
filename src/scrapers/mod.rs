@@ -32,6 +32,7 @@ use crate::{
 };
 
 mod appropedia;
+mod manifests_list;
 mod manifests_repo;
 mod oshwa;
 mod thingiverse;
@@ -391,6 +392,7 @@ pub fn assemble_factories() -> HashMap<String, Box<dyn Factory>> {
     let scrapers: Vec<Box<dyn Factory>> = vec![
         Box::new(oshwa::ScraperFactory),
         Box::new(appropedia::ScraperFactory),
+        Box::new(manifests_list::ScraperFactory),
         Box::new(manifests_repo::ScraperFactory),
         Box::new(thingiverse::ScraperFactory),
     ];
