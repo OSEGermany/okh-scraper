@@ -137,6 +137,20 @@ impl IScraper for Scraper {
                 match r.recv() {
                     Ok(AsyncGitNotification::Pull) => {
                         tracing::trace!("Received pull notification {}/2.", notification_idx + 1);
+                        tracing::trace!(
+                            "   ... progress: {:#?}",
+                            pull.progress().unwrap().unwrap()
+                        );
+                        tracing::trace!("   ... is_pending: {}", pull.is_pending().unwrap());
+                        tracing::trace!(
+                            "   ... last_result: {:#?}",
+                            pull.last_result().unwrap().unwrap()
+                        );
+                        // We do the `if true` to prevent a clippy error
+                        if true {
+                            tracing::error!("This whole section (async git pulling) reports success, but it does not actually pull! :8");
+                            std::process::exit(77);
+                        }
                     }
                     Ok(notification) => {
                         tracing::error!(
