@@ -178,8 +178,8 @@ async fn main() -> Result<(), Error> {
     let mut projects = select_all(scrape_streams);
 
     // pin_mut!(projects); // needed for iteration
-    while let Some(project) = projects.next().await {
-        match project {
+    while let Some(project_or_err) = projects.next().await {
+        match project_or_err {
             Ok(proj) => println!("Scraped project: {}", proj.id),
             Err(err) => {
                 if err.aborts() {
