@@ -10,11 +10,11 @@ SPDX-License-Identifier: CC0-1.0
     https://img.shields.io/badge/License-AGPL%203.0+-blue.svg)](
     LICENSE.txt)
 [![REUSE status](
-    https://api.reuse.software/badge/github.com/iop-alliance/okh-scraper)](
-    https://api.reuse.software/info/github.com/iop-alliance/okh-scraper)
+    https://api.reuse.software/badge/github.com/OSEGermany/okh-scraper)](
+    https://api.reuse.software/info/github.com/OSEGermany/okh-scraper)
 [![Repo](
     https://img.shields.io/badge/Repo-GitHub-555555&logo=github.svg)](
-    https://github.com/iop-alliance/okh-scraper)
+    https://github.com/OSEGermany/okh-scraper)
 [![Package Releases](
     https://img.shields.io/crates/v/okh-scraper.svg)](
     https://crates.io/crates/okh-scraper)
@@ -22,11 +22,11 @@ SPDX-License-Identifier: CC0-1.0
     https://docs.rs/okh-scraper/badge.svg)](
     https://docs.rs/okh-scraper)
 [![Dependency Status](
-    https://deps.rs/repo/github/iop-alliance/okh-scraper/status.svg)](
-    https://deps.rs/repo/github/iop-alliance/okh-scraper)
+    https://deps.rs/repo/github/OSEGermany/okh-scraper/status.svg)](
+    https://deps.rs/repo/github/OSEGermany/okh-scraper)
 [![Build Status](
-    https://github.com/iop-alliance/okh-scraper/workflows/build/badge.svg)](
-    https://github.com/iop-alliance/okh-scraper/actions)
+    https://github.com/OSEGermany/okh-scraper/workflows/build/badge.svg)](
+    https://github.com/OSEGermany/okh-scraper/actions)
 
 [![In cooperation with Open Source Ecology Germany](
     https://raw.githubusercontent.com/osegermany/tiny-files/master/res/media/img/badge-oseg.svg)](
