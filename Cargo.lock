@@ -2723,7 +2723,7 @@ dependencies = [
 
 [[package]]
 name = "okh-scraper"
-version = "2.4.0"
+version = "2.4.1"
 dependencies = [
  "async-std",
  "async-stream",
